@@ -1,5 +1,6 @@
 #include "daemonizar.h"
 
+
 void captura(int sennal){
 	int status = 0;
 
