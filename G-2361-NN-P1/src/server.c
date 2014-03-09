@@ -19,6 +19,7 @@
 #define ERROR -1
 #define MAXDATASIZE 100 
 #define OK 0
+#define MAX_USERS 512
 
 struct sockaddr_in infoS, infoC;
 int socketId;
@@ -28,21 +29,27 @@ typedef struct
 	char * buffer;
 }socketStruct;
 
-char *usuarios[512];
+char *users[MAX_USERS];
 
 typedef struct 
 {
-	char *canales[512];
-	int canUsu[512][512];
+	char *canales[MAX_USERS];
+	int canUsu[MAX_USERS][MAX_USERS];
 }canalestructura;
 
-
 enum comandos {
-	NICK=0,
-	USER=1,
-	QUIT=2,
-	JOIN=3,
-	PASS=4
+	NICK,
+	USER,
+	QUIT,
+	JOIN,
+	PART,
+	PASS,
+	PRIVMSG,
+	AWAY,
+	INFO,
+	INVITE,
+	LIST,
+	NAMES
 };
 
 void captura(int sennal){
@@ -145,7 +152,10 @@ int startListening(int socketIdc){
 		syslog(LOG_ERR,"Error al aceptar la conexion\n");
 		return ERROR;
 	}
-	syslog(LOG_INFO,"Se obtuvo una conexión desde %d\n",inet_ntoa(infoC.sin_addr));
+	char clientIpString[INET_ADDRSTRLEN];
+	int clientIpInt = infoC.sin_addr.s_addr;
+	inet_ntop( AF_INET, &clientIpInt, clientIpString, INET_ADDRSTRLEN );
+	syslog(LOG_INFO,"Se obtuvo una conexión desde %s\n", clientIpString);
 	return desc;
 }
 
@@ -276,6 +286,11 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 				}
 			}*/
 		break;	
+		case PRIVMSG:
+			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);
+		break;
+		default:
+			syslog(LOG_INFO,"erro al realizar accion: \n");
 	}
 }
 
@@ -299,6 +314,9 @@ int procesarMensaje (char * mensaje, char**caracter, int socketId){
 	}else if(strstr(mensaje,"JOIN")!=NULL){
 		sprintf(caracter[socketId],"%s \r\n",mensaje);
 		return JOIN;
+	}else if(strstr(mensaje,"PRIVMSG")!=NULL){
+		sprintf(caracter[socketId],"%s \r\n",mensaje);
+		return PRIVMSG;
 	}
 	return ERROR;
 	
@@ -307,7 +325,7 @@ int procesarMensaje (char * mensaje, char**caracter, int socketId){
 void iniciarStructuras(canalestructura *canales){
 	int i=0,j=0;
 	for(i=0;i<512;i++){
-		usuarios[i]= NULL;
+		users[i]= NULL;
 		canales->canales[i]=NULL;
 		for(j=0;j<512;j++){
 			canales->canUsu[i][j]=(int) NULL;
@@ -361,7 +379,7 @@ int main(int argc, char *argv[]){
 		return ERROR;
 	}
 
-	iniciarStructuras(canales);
+	//iniciarStructuras(canales);
 
 	numPort = atoi(argv[2]);
 	longMax = atoi(argv[3]);
@@ -420,7 +438,7 @@ int main(int argc, char *argv[]){
 			}
 		}
 		while( (read_size = recibeDatos(socketIdC,(void **) mensaje)) > 0 ){
-			ptr = strtok(mensaje[socketIdC], limitador );    // Primera llamada => Primer token
+			ptr = strtok(mensaje[socketIdC], limitador );   
 			proc = procesarMensaje(mensaje[socketIdC],contestacion,socketIdC);
 			realizaAccion(proc,socketIdC,contestacion[socketIdC]);
 		}
