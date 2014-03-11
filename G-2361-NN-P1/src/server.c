@@ -16,11 +16,12 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include "../includes/usersHash.h"
+#include "../includes/channelsHash.h"
+#include "../includes/command.h"
 
 #define ERROR -1
 #define MAXDATASIZE 100 
 #define OK 0
-#define MAX_USERS 512
 
 struct sockaddr_in infoS, infoC;
 int socketId;
@@ -29,27 +30,6 @@ typedef struct
 	int socketId;
 	char * buffer;
 }socketStruct;
-
-typedef struct 
-{
-	char *canales[MAX_USERS];
-	int canUsu[MAX_USERS][MAX_USERS];
-}canalestructura;
-
-enum comandos {
-	NICK,
-	USER,
-	QUIT,
-	JOIN,
-	PART,
-	PASS,
-	PRIVMSG,
-	AWAY,
-	INFO,
-	INVITE,
-	LIST,
-	NAMES
-};
 
 void captura(int sennal){
 	int status = 0;
@@ -250,13 +230,24 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 	char* ptr;
 	int comprobacion=0;
 	int i=0;
-	char *partialMessage;
+	char *command;
+	char *message;
+	Channel *channel;
 	switch(accion){
-		case NICK:
+		case CMD_NICK:
+			usersHash_printLog();
+			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);
+			command = strtok(mensaje, " ");
+			message = strtok(NULL, " \r\n");
+			message = strtok(NULL, " \r\n");
+
+			usersHash_put(socketId, message);
+			syslog(LOG_INFO,"usuario creado %s\n", message);
+			usersHash_printLog();
 		break;
-		case USER:
+		case CMD_USER:
 		break;
-		case QUIT:
+		case CMD_QUIT:
 			syslog(LOG_INFO,"cerrando sesion.....\n");
 			if(cerrarSesion(socketId)==ERROR){
 				syslog(LOG_ERR,"Error al cerrar sesion\n");
@@ -264,15 +255,18 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 			}
 			exit(OK);
 			break;
-		case PART:
+		case CMD_PART:
 		break;	
-		case JOIN:
+		case CMD_JOIN:
 			//hay que arreglar -> el mensaje deberia venir sin la accion.
 			//esto es solo para probar el Hash.
 			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);
-			partialMessage = strsep(&mensaje, " ");
-			usersHash_put(mensaje, socketId);
-			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);
+			command = strtok(mensaje, " ");
+			message = strtok(NULL, " \r\n");
+			channel = channelsHash_put(message);
+			channelsHash_addUser(channel, usersHash_get(socketId));
+			syslog(LOG_INFO,"canal creado %s\n", message);
+
 
 			/*ptr = strtok(mensaje," ");
 			ptr = strtok(NULL," ");
@@ -293,12 +287,15 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 				}
 			}*/
 		break;	
-		case PRIVMSG:
+		case CMD_PRIVMSG:
 			//lista el contenido del hash.
+			syslog(LOG_INFO,"list recibido mensaje: %s\n", mensaje);
 			usersHash_printLog();
-			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);
+			usersHash_size();
+			channelsHash_printLog();
 		break;
 		default:
+			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);
 			syslog(LOG_INFO,"erro al realizar accion: \n");
 	}
 }
@@ -313,37 +310,25 @@ int procesarMensaje (char * mensaje, char**caracter, int socketId){
 	}
 	if(strstr(mensaje,"NICK")!=NULL){
 		sprintf(caracter[socketId],"%s %s \r\n",inicio,mensaje);
-		return NICK;
+		return CMD_NICK;
 	}else if(strstr(mensaje,"USER")!=NULL){
 		sprintf(caracter[socketId],"%s %s \r\n",inicio,mensaje);
-		return USER;
+		return CMD_USER;
 	}else if(strstr(mensaje,"QUIT")!=NULL){
 		sprintf(caracter[socketId],"%s %s \r\n",inicio,mensaje);
-		return QUIT;
+		return CMD_QUIT;
 	}else if(strstr(mensaje,"JOIN")!=NULL){
 		sprintf(caracter[socketId],"%s \r\n",mensaje);
-		return JOIN;
+		return CMD_JOIN;
 	}else if(strstr(mensaje,"PRIVMSG")!=NULL){
 		sprintf(caracter[socketId],"%s \r\n",mensaje);
-		return PRIVMSG;
+		return CMD_PRIVMSG;
 	}else if(strstr(mensaje,"PASS")!=NULL){
 		sprintf(caracter[socketId],"%s \r\n",mensaje);
-		return PRIVMSG;
+		return CMD_PASS;
 	}
 	return ERROR;
 	
-}
-
-void iniciarStructuras(canalestructura *canales){
-	int i=0,j=0;
-	for(i=0;i<512;i++){
-		users[i]= NULL;
-		canales->canales[i]=NULL;
-		for(j=0;j<512;j++){
-			canales->canUsu[i][j]=(int) NULL;
-		}		
-	}
-	return;
 }
 
 int initServer(char * servidor,int numPort,int longMax){
@@ -374,7 +359,6 @@ int main(int argc, char *argv[]){
 	int numPort,longMax,socketIdC,i=0,j=0;
 	socketStruct socketStC;
 	pthread_t thread_id[100];
-	canalestructura *canales;
 	/***/
 	int valor,proc;
 	char * retorno;
@@ -485,4 +469,5 @@ int main(int argc, char *argv[]){
 	}	
 	return OK;
 }
+
 

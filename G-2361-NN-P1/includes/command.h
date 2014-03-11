@@ -1,0 +1,19 @@
+#ifndef COMMAND_H
+#define COMMAND_H
+
+enum comandos {
+	CMD_NICK,
+	CMD_USER,
+	CMD_QUIT,
+	CMD_JOIN,
+	CMD_PART,
+	CMD_PASS,
+	CMD_PRIVMSG,
+	CMD_AWAY,
+	CMD_INFO,
+	CMD_INVITE,
+	CMD_LIST,
+	CMD_NAMES
+};
+
+#endif
