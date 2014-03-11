@@ -15,6 +15,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include "../includes/usersHash.h"
 
 #define ERROR -1
 #define MAXDATASIZE 100 
@@ -28,8 +29,6 @@ typedef struct
 	int socketId;
 	char * buffer;
 }socketStruct;
-
-char *users[MAX_USERS];
 
 typedef struct 
 {
@@ -251,6 +250,7 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 	char* ptr;
 	int comprobacion=0;
 	int i=0;
+	char *partialMessage;
 	switch(accion){
 		case NICK:
 		break;
@@ -264,9 +264,16 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 			}
 			exit(OK);
 			break;
-		case PASS:
+		case PART:
 		break;	
 		case JOIN:
+			//hay que arreglar -> el mensaje deberia venir sin la accion.
+			//esto es solo para probar el Hash.
+			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);
+			partialMessage = strsep(&mensaje, " ");
+			usersHash_put(mensaje, socketId);
+			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);
+
 			/*ptr = strtok(mensaje," ");
 			ptr = strtok(NULL," ");
 			syslog(LOG_INFO,"Creando canal......\n"); 
@@ -287,6 +294,8 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 			}*/
 		break;	
 		case PRIVMSG:
+			//lista el contenido del hash.
+			usersHash_printLog();
 			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);
 		break;
 		default:
@@ -315,6 +324,9 @@ int procesarMensaje (char * mensaje, char**caracter, int socketId){
 		sprintf(caracter[socketId],"%s \r\n",mensaje);
 		return JOIN;
 	}else if(strstr(mensaje,"PRIVMSG")!=NULL){
+		sprintf(caracter[socketId],"%s \r\n",mensaje);
+		return PRIVMSG;
+	}else if(strstr(mensaje,"PASS")!=NULL){
 		sprintf(caracter[socketId],"%s \r\n",mensaje);
 		return PRIVMSG;
 	}

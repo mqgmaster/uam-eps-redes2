@@ -1,12 +1,13 @@
-SOURCE = src
-OBJECTS = obj
+FILES = src/*.c includes/*.h
+OBJECTS = obj/*.o
+INPUT = src/*.c
+OUTPUT = server
 
-build: 
-	gcc -c $(SOURCE)/server.c -o $(OBJECTS)/server.o
-	gcc $(OBJECTS)/server.o -o server
+build: $(FILES)
+	gcc -o $(OUTPUT) $(INPUT)
 
 clean:
-	rm -f server
-	rm -f $(OBJECTS)/*.o
+	rm -f $(OUTPUT)
+	rm -f $(OBJECTS)
 
 rebuild:	clean	build
