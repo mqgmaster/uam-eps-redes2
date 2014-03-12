@@ -230,14 +230,9 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);
 			if(strstr(mensaje, "#")){
 				channel = channelsHash_put(mensaje, "topic");
-				if(channel == NULL){
-					syslog(LOG_ERR,"Fallo channel null\n", mensaje);
-				}
-				
 				usuario = usersHash_get(socketId);
 				syslog(LOG_INFO,"canal creado %s %d %s\n", channel->name, socketId, usuario->nick);
 				channelsHash_addUser(channel, usuario);
-				syslog(LOG_INFO,"canal creado %s\n", mensaje);
 				return OK;
 			}else{
 				syslog(LOG_ERR,"Error en el formato del canal #<canal>%s\n", mensaje);
@@ -247,16 +242,27 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 		case CMD_PRIVMSG:
 			//lista el contenido del hash.
 			syslog(LOG_INFO,"list recibido mensaje: %s\n", mensaje);
-			usersHash_printLog();
-			usersHash_size();
-			channelsHash_printLog();
+			channelsHash_deleteUser(channelsHash_get("canal"), usersHash_get(1));
 		break;
 		case CMD_LIST:
 			//lista el contenido del hash.
 			syslog(LOG_INFO,"list recibido mensaje: %s\n", mensaje);
 			usersHash_printLog();
 			usersHash_size();
+			channelsHash_size();
+			channelsHash_usersSize(channelsHash_get("#canal"));
 			channelsHash_printLog();
+
+			/* iteraciones en la hash: 
+			* hh -> handler de las hash
+			*/
+			syslog(LOG_INFO,"test con iteraciones\n");
+		 	User *testUser, *tmp;
+			HASH_ITER(hh, usersHash_getAll(), testUser, tmp) {
+		    	syslog(LOG_INFO,"usuario (%s)\n", testUser->nick);
+			}
+			
+			
 		break;
 		default:
 			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);

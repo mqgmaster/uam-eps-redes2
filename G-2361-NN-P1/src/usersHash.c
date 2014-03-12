@@ -2,6 +2,34 @@
 
 User *usersHash = NULL;
 
+User* usersHash_getAll() {
+	return usersHash;
+}
+
+User* usersHash_put(int socketId, char *nick) {
+	return usersHash_put_(&usersHash, socketId, nick);
+}
+
+User* usersHash_get(int socketId) {
+	return usersHash_get_(&usersHash, socketId);
+}
+
+void usersHash_delete(int socketId) {
+	usersHash_delete_(&usersHash, socketId);
+}
+
+int usersHash_size() {
+	return usersHash_size_(&usersHash);
+}
+
+void usersHash_printLog() {
+	usersHash_printLog_(&usersHash);
+}
+
+User* usersHash_getByNick(char *nick) {
+	return usersHash_getByNick_(&usersHash, nick);
+}
+
 User* usersHash_put_(User **hash, int socketId, char *nick) {       
 	User *user;
 	HASH_FIND_INT(*hash, &socketId, user);
@@ -16,16 +44,6 @@ User* usersHash_put_(User **hash, int socketId, char *nick) {
 	syslog(LOG_INFO,"creando usuario\n");
 	HASH_ADD_INT(*hash, socketId, user);
 	return user;
-}
-
-int usersHash_putPointer_(User **hash, User *user) {       
-	User *record;
-	HASH_FIND_INT(*hash, &(user->socketId), record);
-	if (record) {
-		return FALSE;                    
-	}
-	HASH_ADD_INT(*hash, socketId, user);
-	return TRUE;
 }
 
 User* usersHash_get_(User **hash, int socketId) {
@@ -59,26 +77,10 @@ void usersHash_printLog_(User **hash) {
 	}
 }
 
-User* usersHash_put(int socketId, char *nick) {
-	return usersHash_put_(&usersHash, socketId, nick);
+int usersHash_size_(User **hash) {
+	int size = HASH_COUNT(*hash);
+	syslog(LOG_INFO,"usuarios (hash size): %d\n", size);
+	return size;
 }
 
-User* usersHash_get(int socketId) {
-	return usersHash_get_(&usersHash, socketId);
-}
 
-void usersHash_delete(int socketId) {
-	usersHash_delete_(&usersHash, socketId);
-}
-
-void usersHash_size() {
-	syslog(LOG_INFO,"usuarios (hash size): %d\n", HASH_COUNT(usersHash));
-}
-
-void usersHash_printLog() {
-	usersHash_printLog_(&usersHash);
-}
-
-User* usersHash_getByNick(char *nick) {
-	return usersHash_getByNick_(&usersHash, nick);
-}
