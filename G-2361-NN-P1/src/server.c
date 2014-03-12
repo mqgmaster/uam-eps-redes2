@@ -143,7 +143,7 @@ int eviarDatos(const void ** msg, int longitud, int socketIdClient){
 	int enviados=0,enviados1 = 0;
 	//const char * mensaje[socketIdClient] = msg[socketIdClient];
 
-	syslog(LOG_INFO,"%s, %d, %d\n",(char *)msg[socketIdClient],longitud,socketIdClient);
+	//syslog(LOG_INFO,"%s, %d, %d\n",(char *)msg[socketIdClient],longitud,socketIdClient);
 	while (longitud > 0){
 		enviados = send(socketIdClient, msg[socketIdClient], longitud, 0);
 		if (enviados <= 0){
@@ -153,7 +153,7 @@ int eviarDatos(const void ** msg, int longitud, int socketIdClient){
 		msg[socketIdClient] += enviados;
 		longitud -= enviados;
 	}
-	syslog(LOG_INFO,"%d",enviados);
+	//syslog(LOG_INFO,"%d",enviados);
 	return enviados;
 }
 
@@ -173,59 +173,32 @@ int recibeDatos(int socketId, void ** msg){
 int cerrarSesion(int socketId){
 	return close(socketId);
 }
-/*void * conexionCliente(void *socket_desc)
-{
+void * conexionCliente(void *socket_desc){
 	
-	int sock = *(int*)socket_desc;
-	char *mensaje;
-	int read_size;
-	syslog(LOG_INFO,"Conectado al socket: %d\n",sock);
-	strcpy(mensaje, "Estas conectado conmigo");
-	if(eviarDatos((void*) mensaje, strlen(mensaje), sock)<0){
-		syslog(LOG_ERR,"error al comunicarme con el cliente\n");
-		return;
-	}
-	syslog(LOG_INFO,"mensaje enviado\n");
-	while( (read_size = recibeDatos(sock,(void*)mensaje)) > 0 )
-	{
-		//end of string marker
-		mensaje[read_size] = '\0';
-		syslog(LOG_INFO,"%s, %d\n",mensaje,read_size);
-		//Send the message back to client
-		if(eviarDatos((void*) mensaje, strlen(mensaje), sock)<0){
-			syslog(LOG_ERR,"error al comunicarme con el cliente\n");
+	socketStruct sock = *(socketStruct*) socket_desc;
+	char **mensaje;
+	char *ptr;
+	char ** contestacion;
+	int read_size,valor;
+	char limitador[] = "\r\n";
+	
+	mensaje = (char**) calloc(100,sizeof(char*));
+	contestacion = (char**)calloc(100,sizeof(char*));
+	mensaje[sock.socketId] = (char*) calloc(512,sizeof(char));
+	contestacion[sock.socketId] = (char*) calloc(512,sizeof(char));
+
+	while( (read_size = recibeDatos(sock.socketId,(void **) mensaje)) > 0 ){
+		syslog(LOG_INFO,"El mensaje en el hilo: %s \n",mensaje[sock.socketId]);
+		ptr = strtok(mensaje[sock.socketId], limitador);   
+		procesarMensaje(mensaje[sock.socketId],contestacion,sock.socketId);
+		valor = strlen(contestacion[sock.socketId]);
+		if(eviarDatos((const void **) contestacion, valor, sock.socketId) == ERROR){
+			syslog(LOG_ERR,"Error al enviar mensaje\n");
+			return;	
 		}
-		//clear the message buffer
-		memset(mensaje, 0, 500);
 	}
-	
-	//Get the socket descriptor
-	//int sock = *((int*)((struct*)socket_desc).socketId);
-	int read_size;
-	char *message , client_message[2000];
-
-	//Receive a message from client
-	while( (read_size = recibeDatos(sock,**message)) > 0 )
-	{
-		//end of string marker
-		client_message[read_size] = '\0';
-		//Send the message back to client
-		write(sock , client_message , strlen(client_message));
-		//clear the message buffer
-		memset(client_message, 0, 2000);
-	}
-
-	if(read_size == 0)
-	{
-		puts("Client disconnected");
-		fflush(stdout);
-	}
-	else if(read_size == -1)
-	{
-		perror("recv failed");
-	}
-	return 0;*/
-//}
+	return 0;
+}
 int realizaAccion (int accion, int socketId, char *mensaje){
 	char* ptr;
 	int comprobacion=0;
@@ -233,17 +206,13 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 	char *command;
 	char *message;
 	Channel *channel;
+	User *usuario;
 	switch(accion){
 		case CMD_NICK:
 			usersHash_printLog();
-			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);
-			command = strtok(mensaje, " ");
-			message = strtok(NULL, " \r\n");
-			message = strtok(NULL, " \r\n");
-
-			usersHash_put(socketId, message);
-			syslog(LOG_INFO,"usuario creado %s\n", message);
+			usersHash_put(socketId, mensaje);
 			usersHash_printLog();
+			return OK;
 		break;
 		case CMD_USER:
 		break;
@@ -258,36 +227,31 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 		case CMD_PART:
 		break;	
 		case CMD_JOIN:
-			//hay que arreglar -> el mensaje deberia venir sin la accion.
-			//esto es solo para probar el Hash.
 			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);
-			command = strtok(mensaje, " ");
-			message = strtok(NULL, " \r\n");
-			channel = channelsHash_put(message);
-			channelsHash_addUser(channel, usersHash_get(socketId));
-			syslog(LOG_INFO,"canal creado %s\n", message);
-
-
-			/*ptr = strtok(mensaje," ");
-			ptr = strtok(NULL," ");
-			syslog(LOG_INFO,"Creando canal......\n"); 
-			for(i=0;i<512;i++){
-				if(strcmp(canales[i],ptr)==0){
-					syslog(LOG_ERR,"Canal ya creado\n");
-					comprobacion =1;
+			if(strstr(mensaje, "#")){
+				channel = channelsHash_put(mensaje, "topic");
+				if(channel == NULL){
+					syslog(LOG_ERR,"Fallo channel null\n", mensaje);
 				}
+				
+				usuario = usersHash_get(socketId);
+				syslog(LOG_INFO,"canal creado %s %d %s\n", channel->name, socketId, usuario->nick);
+				channelsHash_addUser(channel, usuario);
+				syslog(LOG_INFO,"canal creado %s\n", mensaje);
+				return OK;
+			}else{
+				syslog(LOG_ERR,"Error en el formato del canal #<canal>%s\n", mensaje);
+				return ERROR;
 			}
-			if(comprobacion==0){
-				for(i=0;i<512;i++){
-					if(strcmp(canales[i],"")==0){
-						strcpy(canales[i],ptr);
-						syslog(LOG_INFO,"Creado canal :) %s\n",canales[i]);
-						break; 
-					}
-				}
-			}*/
 		break;	
 		case CMD_PRIVMSG:
+			//lista el contenido del hash.
+			syslog(LOG_INFO,"list recibido mensaje: %s\n", mensaje);
+			usersHash_printLog();
+			usersHash_size();
+			channelsHash_printLog();
+		break;
+		case CMD_LIST:
 			//lista el contenido del hash.
 			syslog(LOG_INFO,"list recibido mensaje: %s\n", mensaje);
 			usersHash_printLog();
@@ -298,27 +262,67 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);
 			syslog(LOG_INFO,"erro al realizar accion: \n");
 	}
+	return ERROR;
 }
 
 
 int procesarMensaje (char * mensaje, char**caracter, int socketId){
 	char crlf[4]="\r\n";
-	char inicio[8]=":Server ";	
+	char* ptr;
+	char inicio[8]=":Server";
+	int retorno=0;	
+	User * usuario;
+	Channel * canal;
 	if(mensaje == NULL){
 		syslog(LOG_ERR,"Error mensaje null\n");
 		return ERROR;
 	}
 	if(strstr(mensaje,"NICK")!=NULL){
-		sprintf(caracter[socketId],"%s %s \r\n",inicio,mensaje);
+		ptr = strtok(mensaje," ");
+		ptr = strtok(NULL," \r\n");
+		retorno = realizaAccion(CMD_NICK,socketId,ptr); 
+		if(retorno == ERROR){
+			return ERROR;
+		}/*else if(retorno == ERR_NICKNAMEINUSE){
+			sprintf(caracter[socketId],"%s ERR_NICKNAMEINUSE \r\n",inicio);
+		}*/else{
+			sprintf(caracter[socketId],":%s Welcome to the Internet Relay Network %s \r\n",inicio,ptr);
+			//sprintf(caracter[socketId],":%s 001 %s \r\n",inicio,ptr);
+		}
 		return CMD_NICK;
 	}else if(strstr(mensaje,"USER")!=NULL){
-		sprintf(caracter[socketId],"%s %s \r\n",inicio,mensaje);
+		//sprintf(caracter[socketId],"%s %s \r\n",inicio,mensaje);
 		return CMD_USER;
 	}else if(strstr(mensaje,"QUIT")!=NULL){
-		sprintf(caracter[socketId],"%s %s \r\n",inicio,mensaje);
+		ptr = strtok(mensaje," ");
+		ptr = strtok(mensaje," ");
+		if(ptr==NULL){
+			sprintf(caracter[socketId],"%s QUIT \r\n",inicio);
+		}else{
+			sprintf(caracter[socketId],"%s QUIT :%s \r\n",inicio,ptr);
+		}
 		return CMD_QUIT;
 	}else if(strstr(mensaje,"JOIN")!=NULL){
-		sprintf(caracter[socketId],"%s \r\n",mensaje);
+		ptr = strtok(mensaje," ");
+		ptr = strtok(NULL," \r\n");
+		if(realizaAccion(CMD_JOIN,socketId,ptr)==ERROR){
+			sprintf(caracter[socketId],"%s Error en el formato del canal #<canal> %s\r\n",inicio,ptr);
+			return ERROR;
+		}
+		//sprintf(caracter[socketId],"%s JOIN: %s \r\n",inicio,ptr);
+		usuario = usersHash_get(socketId);
+		canal = channelsHash_get(ptr);
+		sprintf(caracter[socketId],"%s JOIN :%s\r\n",inicio,ptr);
+		if(eviarDatos((const void **) caracter, strlen(caracter[socketId]),socketId) == ERROR){
+			syslog(LOG_ERR,"Error al enviar mensaje\n");
+			return;	
+		}
+		sprintf(caracter[socketId],"%s 332 %s %s :%s\r\n",inicio, usuario->nick,ptr,canal->topic);		
+		if(eviarDatos((const void **) caracter, strlen(caracter[socketId]),socketId) == ERROR){
+			syslog(LOG_ERR,"Error al enviar mensaje\n");
+			return;	
+		}
+		sprintf(caracter[socketId],"%s 353 %s=%s\r\n",inicio, usuario->nick,ptr);
 		return CMD_JOIN;
 	}else if(strstr(mensaje,"PRIVMSG")!=NULL){
 		sprintf(caracter[socketId],"%s \r\n",mensaje);
@@ -326,6 +330,12 @@ int procesarMensaje (char * mensaje, char**caracter, int socketId){
 	}else if(strstr(mensaje,"PASS")!=NULL){
 		sprintf(caracter[socketId],"%s \r\n",mensaje);
 		return CMD_PASS;
+	}else if(strstr(mensaje,"LIST")!=NULL){
+		if(realizaAccion(CMD_LIST,socketId,ptr)==ERROR){
+			return ERROR;
+		}
+		sprintf(caracter[socketId],"%s \r\n",mensaje);
+		return CMD_LIST;
 	}
 	return ERROR;
 	
@@ -357,7 +367,7 @@ int initServer(char * servidor,int numPort,int longMax){
 
 int main(int argc, char *argv[]){
 	int numPort,longMax,socketIdC,i=0,j=0;
-	socketStruct socketStC;
+	socketStruct *socketStC;
 	pthread_t thread_id[100];
 	/***/
 	int valor,proc;
@@ -388,15 +398,23 @@ int main(int argc, char *argv[]){
 	//El servidor se pondra a escuchar peticiones
 	i=0;
 	syslog(LOG_INFO,"Esperando conexion\n");
-	mensaje = (char**) calloc(100,sizeof(char*));
-	contestacion = (char**)calloc(100,sizeof(char*));
+	socketStC = (socketStruct*) calloc(512,sizeof(socketStruct));
 	while(1){
 		socketIdC = startListening(socketId);
 		if(socketIdC < 0){
 			syslog(LOG_ERR,"Error al conectar con el cliente \n");
 			return ERROR;
 		}
+		socketStC[socketIdC].socketId = socketIdC;
+		socketStC[socketIdC].buffer = calloc (50,sizeof(char));
+		syslog(LOG_INFO,"Creando hijo, cliente nº: %d\n",socketIdC);
 
+		if(pthread_create(&thread_id[i],NULL,conexionCliente,(void*) &socketStC[socketIdC]) < 0){
+			printf("No se ha podido crear el hilo.\n");
+			return ERROR;
+       		}
+		i++;
+/*
 		mensaje[socketIdC] = (char*) calloc(500,sizeof(char));
 		contestacion[socketIdC] = (char*) calloc(500,sizeof(char));
 
@@ -407,16 +425,9 @@ int main(int argc, char *argv[]){
 
 		syslog(LOG_INFO,"El mensaje: %s\n",mensaje[socketIdC]);
 
-		/*len=strlen(mensaje);
-		if(eviarDatos((void *) mensaje, len, socketIdC)<0){
-			syslog(LOG_ERR,"Error al comunicarme con el cliente\n");
-			return;
-		}*/
-
 		ptr = strtok(mensaje[socketIdC], limitador );    // Primera llamada => Primer token
 		syslog(LOG_INFO,"%s\n", ptr );
-		proc = procesarMensaje(mensaje[socketIdC],contestacion,socketIdC);
-		syslog(LOG_INFO,"contestacion: %s\n", contestacion[socketIdC]);
+		procesarMensaje(mensaje[socketIdC],contestacion,socketIdC);
 		valor = strlen(contestacion[socketIdC]);
 		if(eviarDatos((const void **) contestacion, valor, socketIdC) == ERROR){
 			syslog(LOG_ERR,"Error al enviar mensaje\n");
@@ -426,7 +437,7 @@ int main(int argc, char *argv[]){
 		while( (ptr = strtok(NULL,limitador)) != NULL ) {   // Posteriores llamadas
 			syslog(LOG_INFO,"Seguimos: %s\n",ptr);
 			proc = procesarMensaje(ptr,contestacion,socketIdC);
-			syslog(LOG_INFO,"contestacion: %s\n", contestacion[socketIdC]);
+			realizaAccion(proc,socketIdC,contestacion[socketIdC]);
 			valor = strlen(contestacion[socketIdC]);
 			if(eviarDatos((const void **) contestacion, valor, socketIdC) == ERROR){
 				syslog(LOG_ERR,"Error al enviar mensaje\n");
@@ -436,9 +447,8 @@ int main(int argc, char *argv[]){
 		while( (read_size = recibeDatos(socketIdC,(void **) mensaje)) > 0 ){
 			ptr = strtok(mensaje[socketIdC], limitador );   
 			proc = procesarMensaje(mensaje[socketIdC],contestacion,socketIdC);
-			realizaAccion(proc,socketIdC,contestacion[socketIdC]);
 		}
-
+*/
 		//cerrarSesion(socketIdC);		
 		//return OK;
 		/*

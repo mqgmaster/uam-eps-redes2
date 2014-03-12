@@ -22,7 +22,6 @@ int usersHash_putPointer_(User **hash, User *user) {
 	User *record;
 	HASH_FIND_INT(*hash, &(user->socketId), record);
 	if (record) {
-		syslog(LOG_INFO,"usuario ja existe\n");
 		return FALSE;                    
 	}
 	HASH_ADD_INT(*hash, socketId, user);

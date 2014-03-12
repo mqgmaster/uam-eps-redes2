@@ -2,7 +2,7 @@
 
 Channel *channelsHash = NULL;     
 
-Channel* channelsHash_put(char *name) {       
+Channel* channelsHash_put(char *name, char * topic) {       
 	Channel *channel;
 	HASH_FIND_STR(channelsHash, name, channel);
 	if (channel) {
@@ -10,6 +10,7 @@ Channel* channelsHash_put(char *name) {
 	}
 	channel = malloc(sizeof(Channel));
 	channel->name = malloc(strlen(name) + 1);
+	channel->topic = malloc(strlen(topic) + 1);
 	channel->users = NULL;
 	strcpy(channel->name, name);
 	HASH_ADD_STR(channelsHash, name, channel);
@@ -44,7 +45,7 @@ void channelsHash_delete(char *name) {
 void channelsHash_printLog() {       
 	Channel *channel;
 	for (channel = channelsHash; channel != NULL; channel = channel->hh.next) {
-		syslog(LOG_INFO,"usuarios del canal (%s)\n", channel->name);
+		syslog(LOG_INFO,"usuarios del canal (%s)(%s)\n", channel->name,channel->topic);
 		usersHash_printLog_(&(channel->users));
 	}
 }
