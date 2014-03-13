@@ -124,11 +124,12 @@ int nickFunction(char *mensaje,char**caracter, int socketId){
 int joinFunction(char *mensaje,char**caracter, int socketId){
 	
 	char crlf[4]="\r\n";
-	char* ptr, *mens;
+	char* ptr, **mens;
 	char inicio[8]="Server";
 	int retorno=0,contador=0,i=0;	
 	User * usuario;
 	Channel * canal;
+	mens = (char**) calloc(512,sizeof(char*));
 
 	ptr = strtok(mensaje," ");
 	ptr = strtok(NULL," \r\n");
@@ -146,36 +147,72 @@ int joinFunction(char *mensaje,char**caracter, int socketId){
 	sprintf(caracter[socketId],":%s 353 %s = %s :",inicio, usuario->nick,canal->name);		
 	contador = channelsHash_usersSize(canal);
 	
-	for (i = 0; i < contador; i++){
-		strcat(caracter[socketId],canal->users->nick);
-		canal->users = canal->users->hh.next;
+	User *user, *tmp;
+	HASH_ITER(hh, canal->users, user, tmp) {
+    	strcat(caracter[socketId],user->nick);
+    	strcat(caracter[socketId]," ");
 	}
+		
 	strcat(caracter[socketId],crlf);
 	syslog(LOG_INFO,"%s\n",caracter[socketId]);
 	channelsHash_printLog();
 
-	if(eviarDatos((const void **) caracter, strlen(caracter[socketId]),socketId) == ERROR){
-		syslog(LOG_ERR,"Error al enviar mensaje\n");
-		return;	
+	HASH_ITER(hh, canal->users, user, tmp) {
+		mens[user->socketId] = (char*) calloc(512,sizeof(char));
+		strcpy(mens[user->socketId],caracter[socketId]);
+		syslog(LOG_INFO,"%s\n",mens[user->socketId]);
+		if(eviarDatos((const void **) mens, strlen(caracter[socketId]),user->socketId) == ERROR){
+				syslog(LOG_ERR,"Error al enviar mensaje\n");
+				return;	
+		}
 	}
+	
 
 }
 
 int privMsgFunction(char *mensaje,char**caracter, int socketId){
 	char crlf[4]="\r\n";
-	char* ptr,*canal,*mens;
+	char* ptr,*canal,*mens,**mens1;
 	int retorno=0,contador=0,i=0;	
-	Channel *chan;
+	User * usuario;
+	User *user, *tmp;
+	Channel * chan;
 	int chanSize;
 
 	ptr = strtok(mensaje," ");
 	canal = strtok(NULL," :");
 	mens = strtok(NULL,"\r\n");
 	syslog(LOG_INFO,"%s %s %s\n",ptr,canal,mens);
+	usuario = usersHash_get(socketId);
+	mens1 = (char**) calloc(512,sizeof(char*));
+	if(strstr(canal,"#")!=NULL){
+		//es un canal
+		chan = channelsHash_get(canal);
+		chanSize = channelsHash_usersSize(chan);
 
-	chan = channelsHash_get(canal);
-	chanSize=channelsHash_usersSize(chan);
-	channelsHash_printLog();
+		HASH_ITER(hh, chan->users, user, tmp) {
+			if (user->socketId != socketId) {
+				mens1[user->socketId] = (char*) calloc(512,sizeof(char));
+				sprintf(mens1[user->socketId],":%s PRIVMSG %s %s\r\n",usuario->nick,canal,mens);
+				syslog(LOG_INFO,"%s\n",mens1[user->socketId]);
+				if(eviarDatos((const void **) mens1, strlen(mens1[user->socketId]),user->socketId) == ERROR){
+						syslog(LOG_ERR,"Error al enviar mensaje\n");
+						return;
+				}
+			}
+		}
+	}else{
+		//es un usuario
+		user = usersHash_getByNick(canal);
+		mens1[user->socketId] = (char*) calloc(512,sizeof(char));
+		sprintf(mens1[user->socketId],":%s PRIVMSG %s %s\r\n",usuario->nick,user->nick,mens);
+		syslog(LOG_INFO,"%s\n",mens1[user->socketId]);
+		if(eviarDatos((const void **) mens1, strlen(mens1[user->socketId]),user->socketId) == ERROR){
+				syslog(LOG_ERR,"Error al enviar mensaje\n");
+				return;
+		}		
+	}
+
 	return OK;
 }
 
