@@ -18,6 +18,9 @@
 #include "../includes/usersHash.h"
 #include "../includes/channelsHash.h"
 #include "../includes/command.h"
+#include "../includes/daemon.h"
+#include "../includes/socket.h"
+#include "../includes/mensaje.h"
 
 #define ERROR -1
 #define MAXDATASIZE 100 
@@ -25,87 +28,79 @@
 
 struct sockaddr_in infoS, infoC;
 int socketId;
+char servidor[50]="";
 typedef struct 
 {
 	int socketId;
 	char * buffer;
 }socketStruct;
 
-void captura(int sennal){
+
+/*void captura(int sennal){
 	int status = 0;
 
 	printf("funcion captura\n");
 	wait(&status);
 	closelog();	
 	return;
-}
+}*/
 
-
-int daemonizar (char * mensaje){
+/*int daemonizar (char * mensaje){
 	pid_t pid;
-	//1. Se capturan las señales SIGTTOU,SIGTTIN,SIGTSTP que provienen de la terminal con la funcion de C signal que enviara la captura a la funcion de tratamiento de señales predefinida SIG_IGN
-	if(signal(SIGTTOU,SIG_IGN) == SIG_ERR || signal(SIGTTIN,SIG_IGN) == SIG_ERR || signal(SIGTSTP,SIG_IGN) == SIG_ERR){
+	/*1. Se capturan las señales SIGTTOU,SIGTTIN,SIGTSTP que provienen de la terminal con la funcion de C signal que enviara la captura a la funcion de tratamiento de señales predefinida SIG_IGN*/
+/*	if(signal(SIGTTOU,SIG_IGN) == SIG_ERR || signal(SIGTTIN,SIG_IGN) == SIG_ERR || signal(SIGTSTP,SIG_IGN) == SIG_ERR){
 		printf("Error al capturar las señales\n");	
 		exit(ERROR);	
 	}
-	//2. Se crea un proceso hijo
-	pid = fork();
+	/*2. Se crea un proceso hijo*/
+/*	pid = fork();
 	if(pid != 0){
-		//3.Se cierra el proceso padre
-		//padre
-		exit(OK);
+		/*3.Se cierra el proceso padre*/
+/*		exit(OK);
 	}else{
-		//4.Se crea una nueva sesion de tal forma que el proceso se convierte en el lider de la sesion
-		if(setsid()<0){
+		/*4.Se crea una nueva sesion de tal forma que el proceso se convierte en el lider de la sesion*/
+/*		if(setsid()<0){
 			syslog(LOG_ERR,"Error al crear la sesion\n");
 			exit(ERROR);
 		}
-		openlog(mensaje,LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL0);
+/*		openlog(mensaje,LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL0);
 		syslog(LOG_INFO,"iniciando servidor.");
-		//5.Se pierde el control por parte del tty capturando la señal SIGHUP con la funcion SIG_IGN
-		if(signal(SIGHUP,SIG_IGN)==SIG_ERR){
+		/*5.Se pierde el control por parte del tty capturando la señal SIGHUP con la funcion SIG_IGN*/
+/*		if(signal(SIGHUP,SIG_IGN)==SIG_ERR){
 			syslog(LOG_ERR,"Error al caputrar la señal SIGHUP\n");
 			exit(ERROR);	
 		}
-		//6.Los ficheros creados por el servidor deben ser accesibles a todo el mundo.Para ello es necesario cambiar la mascara de creacion de ficheros.
-		//comprobar esto
-		umask(S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
-		//7.Por seguridad se puede cambiar el directorio de trabajo a, por ejemplo, en raiz
-		if((chdir("/"))<0){
+		/*6.Los ficheros creados por el servidor deben ser accesibles a todo el mundo.Para ello es necesario cambiar la mascara de creacion de ficheros.*/
+/*		umask(S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+		/*7.Por seguridad se puede cambiar el directorio de trabajo a, por ejemplo, en raiz*/
+/*		if((chdir("/"))<0){
 			syslog(LOG_ERR,"Error al cambiar el directorio de trabajo\n");
 			exit(ERROR);
 		}
-		//8.Es necesario cerrar todos los ficheros abiertos previamente
-		close(STDIN_FILENO); 
+		/*8.Es necesario cerrar todos los ficheros abiertos previamente*/
+/*		close(STDIN_FILENO); 
 		close(STDOUT_FILENO); 
 		close(STDERR_FILENO);
-		//9. Se capturan las señales SIGCHLD y SIGPWR con la funcion que debe crearse que espera a que termine el demonio debido a estas señales y cierra el log;++
-		if(signal(SIGCHLD,captura) == SIG_ERR || signal(SIGPWR,captura) == SIG_ERR){
+		/*9. Se capturan las señales SIGCHLD y SIGPWR con la funcion que debe crearse que espera a que termine el demonio debido a estas señales y cierra el log;++*/
+/*		if(signal(SIGCHLD,captura) == SIG_ERR || signal(SIGPWR,captura) == SIG_ERR){
 			syslog(LOG_ERR,"Error al capturar las señales\n");	
 			exit(ERROR);	
 		}
 		return OK;
 	}
-}
+}*/
 
-int openSocket(){
-	//TCP cambiado por 0
+/*int openSocket(){
 	return socket(AF_INET,SOCK_STREAM,0);
 }
 
 int assignSocket(int socketId,int numPort){
-	//TCP/IP
 	infoS.sin_family=AF_INET;
-	// asignamos el puerto
 	infoS.sin_port=htons(numPort);
-	//aceptar todas las direcciones
 	infoS.sin_addr.s_addr=INADDR_ANY;
-	
-	
-	//mirar esta funcion	
+
 	bzero(&(infoS.sin_zero), 8);	
 
-	// asignar el puerto al soket
 	if(bind(socketId,(struct sockaddr *)&infoS,sizeof(struct sockaddr)) == ERROR){
 		printf("Error al asignar el socket, %s\n" ,strerror(errno));
 		return ERROR;
@@ -138,12 +133,13 @@ int startListening(int socketIdc){
 	return desc;
 }
 
+int cerrarSesion(int socketId){
+	return close(socketId);
+}
+*/
+/*
 int eviarDatos(const void ** msg, int longitud, int socketIdClient){
-	
-	int enviados=0,enviados1 = 0;
-	//const char * mensaje[socketIdClient] = msg[socketIdClient];
-
-	//syslog(LOG_INFO,"%s, %d, %d\n",(char *)msg[socketIdClient],longitud,socketIdClient);
+	int enviados=0;
 	while (longitud > 0){
 		enviados = send(socketIdClient, msg[socketIdClient], longitud, 0);
 		if (enviados <= 0){
@@ -153,52 +149,66 @@ int eviarDatos(const void ** msg, int longitud, int socketIdClient){
 		msg[socketIdClient] += enviados;
 		longitud -= enviados;
 	}
-	//syslog(LOG_INFO,"%d",enviados);
 	return enviados;
 }
 
 int recibeDatos(int socketId, void ** msg){
-	
 	int recibidos=0;
-
 	if(msg == NULL){
 		syslog(LOG_ERR,"Error mensaje null\n");
 		return ERROR;
 	}
 	recibidos = recv(socketId,(char*) msg[socketId], 500, 0);
-
 	return recibidos;
 }
+*/
 
-int cerrarSesion(int socketId){
-	return close(socketId);
-}
+
 void * conexionCliente(void *socket_desc){
-	
 	socketStruct sock = *(socketStruct*) socket_desc;
 	char **mensaje;
 	char *ptr;
 	char ** contestacion;
 	int read_size,valor;
 	char limitador[] = "\r\n";
-	
+
 	mensaje = (char**) calloc(100,sizeof(char*));
 	contestacion = (char**)calloc(100,sizeof(char*));
 	mensaje[sock.socketId] = (char*) calloc(512,sizeof(char));
 	contestacion[sock.socketId] = (char*) calloc(512,sizeof(char));
 
+	sprintf(contestacion[sock.socketId],":%s 020 * :Please wait wile we process your connection to %s\r\n",servidor,servidor);
+	if(eviarDatos((const void **) contestacion, strlen(contestacion[sock.socketId]), sock.socketId) == ERROR){
+		syslog(LOG_ERR,"Error al enviar mensaje\n");
+		return NULL;	
+	}
+
+	if(read_size = recibeDatos(sock.socketId,(void **) mensaje)<0){
+		syslog(LOG_ERR,"Error al recibir el mensaje\n");
+		return NULL;
+	}
+
+	ptr = strtok(mensaje[sock.socketId], limitador);
+	ptr = strtok(NULL, limitador); 
+	syslog(LOG_INFO,"%s %s\n",mensaje[sock.socketId],ptr);
+
+	procesarMensaje(mensaje[sock.socketId],contestacion,sock.socketId);
+	procesarMensaje(ptr,contestacion,sock.socketId);
+	strcpy(mensaje[sock.socketId], "");
+	syslog(LOG_INFO,"%s\n",mensaje[sock.socketId]);
 	while( (read_size = recibeDatos(sock.socketId,(void **) mensaje)) > 0 ){
-		syslog(LOG_INFO,"El mensaje en el hilo: %s \n",mensaje[sock.socketId]);
+		syslog(LOG_INFO,"%s \n",mensaje[sock.socketId]);
 		ptr = strtok(mensaje[sock.socketId], limitador);   
 		procesarMensaje(mensaje[sock.socketId],contestacion,sock.socketId);
 		valor = strlen(contestacion[sock.socketId]);
 		if(eviarDatos((const void **) contestacion, valor, sock.socketId) == ERROR){
 			syslog(LOG_ERR,"Error al enviar mensaje\n");
-			return;	
+			return NULL;	
 		}
 	}
-	return 0;
+	return OK;
 }
+/*
 int realizaAccion (int accion, int socketId, char *mensaje){
 	char* ptr;
 	int comprobacion=0;
@@ -209,7 +219,6 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 	User *usuario;
 	switch(accion){
 		case CMD_NICK:
-			usersHash_printLog();
 			usersHash_put(socketId, mensaje);
 			usersHash_printLog();
 			return OK;
@@ -240,29 +249,23 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 			}
 		break;	
 		case CMD_PRIVMSG:
-			//lista el contenido del hash.
 			syslog(LOG_INFO,"list recibido mensaje: %s\n", mensaje);
 			channelsHash_deleteUser(channelsHash_get("canal"), usersHash_get(1));
 		break;
 		case CMD_LIST:
-			//lista el contenido del hash.
 			syslog(LOG_INFO,"list recibido mensaje: %s\n", mensaje);
 			usersHash_printLog();
 			usersHash_size();
 			channelsHash_size();
 			channelsHash_usersSize(channelsHash_get("#canal"));
 			channelsHash_printLog();
-
-			/* iteraciones en la hash: 
-			* hh -> handler de las hash
-			*/
 			syslog(LOG_INFO,"test con iteraciones\n");
 		 	User *testUser, *tmp;
 			HASH_ITER(hh, usersHash_getAll(), testUser, tmp) {
 		    	syslog(LOG_INFO,"usuario (%s)\n", testUser->nick);
-			}
-			
-			
+			}			
+		break;
+		case CMD_PING:
 		break;
 		default:
 			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);
@@ -271,12 +274,109 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 	return ERROR;
 }
 
+int nickFunction(char *mensaje,char**caracter, int socketId){
+	
+	char crlf[4]="\r\n";
+	char* ptr, *mens;
+	char inicio[8]="Server";
+	int retorno=0,contador=0,i=0;	
+	User * usuario;
+	Channel * canal;
+	
+	ptr = strtok(mensaje," ");
+	ptr = strtok(NULL," \r\n");
+	syslog(LOG_INFO,"%s %s\n",mensaje,ptr);
+	
+	retorno = realizaAccion(CMD_NICK,socketId,ptr); 
+	if(retorno == ERROR){
+		return ERROR;
+	}else{
+		sprintf(caracter[socketId],":%s 001 %s :Welcome to the Internet Relay Network %s \r\n",servidor,ptr,ptr);
+		if(eviarDatos((const void **) caracter, strlen(caracter[socketId]),socketId) == ERROR){
+			syslog(LOG_ERR,"Error al enviar mensaje\n");
+			return ERROR;	
+		}
+	}
+	return OK;
+}
+
+int joinFunction(char *mensaje,char**caracter, int socketId){
+	
+	char crlf[4]="\r\n";
+	char* ptr, *mens;
+	char inicio[8]="Server";
+	int retorno=0,contador=0,i=0;	
+	User * usuario;
+	Channel * canal;
+
+	ptr = strtok(mensaje," ");
+	ptr = strtok(NULL," \r\n");
+	if(realizaAccion(CMD_JOIN,socketId,ptr)==ERROR){
+		sprintf(caracter[socketId],":%s Error en el formato del canal #<canal> %s\r\n",servidor,ptr);
+		return ERROR;
+	}
+	usuario = usersHash_get(socketId);
+	canal = channelsHash_get(ptr);
+	sprintf(caracter[socketId],":%s!%s JOIN :%s\r\n",usuario->nick,servidor,canal->name);
+	if(eviarDatos((const void **) caracter, strlen(caracter[socketId]),socketId) == ERROR){
+		syslog(LOG_ERR,"Error al enviar mensaje\n");
+		return;	
+	}
+	sprintf(caracter[socketId],":%s 353 %s = %s :",servidor, usuario->nick,canal->name);		
+	contador = channelsHash_usersSize(canal);
+	
+	for (i = 0; i < contador; i++){
+		strcat(caracter[socketId],canal->users->nick);
+		canal->users = canal->users->hh.next;
+	}
+	strcat(caracter[socketId],crlf);
+	syslog(LOG_INFO,"%s\n",caracter[socketId]);
+	channelsHash_printLog();
+
+	if(eviarDatos((const void **) caracter, strlen(caracter[socketId]),socketId) == ERROR){
+		syslog(LOG_ERR,"Error al enviar mensaje\n");
+		return;	
+	}
+
+}
+
+int privMsgFunction(char *mensaje,char**caracter, int socketId){
+	char crlf[4]="\r\n";
+	char* ptr,*canal,*mens;
+	int retorno=0,contador=0,i=0;	
+	Channel *chan;
+	int chanSize;
+
+	ptr = strtok(mensaje," ");
+	canal = strtok(NULL," :");
+	mens = strtok(NULL,"\r\n");
+	syslog(LOG_INFO,"%s %s %s\n",ptr,canal,mens);
+
+	chan = channelsHash_get(canal);
+	chanSize=channelsHash_usersSize(chan);
+	channelsHash_printLog();
+	return OK;
+}
+
+int pingFunction(char *mensaje,char**caracter, int socketId){
+	char* ptr;	
+
+	ptr = strtok(mensaje," ");
+	ptr = strtok(NULL," \r\n");
+	sprintf(caracter[socketId],":%s PONG %s :%s",servidor, servidor,ptr);
+
+	if(eviarDatos((const void **) caracter, strlen(caracter[socketId]),socketId) == ERROR){
+		syslog(LOG_ERR,"Error al enviar mensaje\n");
+		return ERROR;	
+	}
+	return OK;
+}
 
 int procesarMensaje (char * mensaje, char**caracter, int socketId){
 	char crlf[4]="\r\n";
-	char* ptr;
-	char inicio[8]=":Server";
-	int retorno=0;	
+	char* ptr, *mens;
+	char inicio[8]="Server";
+	int retorno=0,contador=0,i=0;	
 	User * usuario;
 	Channel * canal;
 	if(mensaje == NULL){
@@ -284,16 +384,9 @@ int procesarMensaje (char * mensaje, char**caracter, int socketId){
 		return ERROR;
 	}
 	if(strstr(mensaje,"NICK")!=NULL){
-		ptr = strtok(mensaje," ");
-		ptr = strtok(NULL," \r\n");
-		retorno = realizaAccion(CMD_NICK,socketId,ptr); 
-		if(retorno == ERROR){
+		if(nickFunction(mensaje,caracter,socketId)==ERROR){
+			syslog(LOG_ERR,"ERROR en la funcion nickFunction\n");
 			return ERROR;
-		}/*else if(retorno == ERR_NICKNAMEINUSE){
-			sprintf(caracter[socketId],"%s ERR_NICKNAMEINUSE \r\n",inicio);
-		}*/else{
-			sprintf(caracter[socketId],":%s Welcome to the Internet Relay Network %s \r\n",inicio,ptr);
-			//sprintf(caracter[socketId],":%s 001 %s \r\n",inicio,ptr);
 		}
 		return CMD_NICK;
 	}else if(strstr(mensaje,"USER")!=NULL){
@@ -303,35 +396,24 @@ int procesarMensaje (char * mensaje, char**caracter, int socketId){
 		ptr = strtok(mensaje," ");
 		ptr = strtok(mensaje," ");
 		if(ptr==NULL){
-			sprintf(caracter[socketId],"%s QUIT \r\n",inicio);
+			sprintf(caracter[socketId],":%s QUIT \r\n",inicio);
 		}else{
-			sprintf(caracter[socketId],"%s QUIT :%s \r\n",inicio,ptr);
+			sprintf(caracter[socketId],":%s QUIT :%s \r\n",inicio,ptr);
 		}
 		return CMD_QUIT;
 	}else if(strstr(mensaje,"JOIN")!=NULL){
-		ptr = strtok(mensaje," ");
-		ptr = strtok(NULL," \r\n");
-		if(realizaAccion(CMD_JOIN,socketId,ptr)==ERROR){
-			sprintf(caracter[socketId],"%s Error en el formato del canal #<canal> %s\r\n",inicio,ptr);
+		if(joinFunction(mensaje,caracter,socketId)==ERROR){
+			syslog(LOG_ERR,"ERROR en la funcion joinFunction\n");
 			return ERROR;
 		}
-		//sprintf(caracter[socketId],"%s JOIN: %s \r\n",inicio,ptr);
-		usuario = usersHash_get(socketId);
-		canal = channelsHash_get(ptr);
-		sprintf(caracter[socketId],"%s JOIN :%s\r\n",inicio,ptr);
-		if(eviarDatos((const void **) caracter, strlen(caracter[socketId]),socketId) == ERROR){
-			syslog(LOG_ERR,"Error al enviar mensaje\n");
-			return;	
-		}
-		sprintf(caracter[socketId],"%s 332 %s %s :%s\r\n",inicio, usuario->nick,ptr,canal->topic);		
-		if(eviarDatos((const void **) caracter, strlen(caracter[socketId]),socketId) == ERROR){
-			syslog(LOG_ERR,"Error al enviar mensaje\n");
-			return;	
-		}
-		sprintf(caracter[socketId],"%s 353 %s=%s\r\n",inicio, usuario->nick,ptr);
+		//sprintf(caracter[socketId],":%s 366 %s %s \r\n",inicio, usuario->nick,canal->name);
 		return CMD_JOIN;
 	}else if(strstr(mensaje,"PRIVMSG")!=NULL){
-		sprintf(caracter[socketId],"%s \r\n",mensaje);
+		if(privMsgFunction(mensaje,caracter,socketId)==ERROR){
+			syslog(LOG_ERR,"ERROR en la funcion nickFunction\n");
+			return ERROR;
+		}
+		//sprintf(caracter[socketId],"%s \r\n",mensaje);
 		return CMD_PRIVMSG;
 	}else if(strstr(mensaje,"PASS")!=NULL){
 		sprintf(caracter[socketId],"%s \r\n",mensaje);
@@ -342,10 +424,17 @@ int procesarMensaje (char * mensaje, char**caracter, int socketId){
 		}
 		sprintf(caracter[socketId],"%s \r\n",mensaje);
 		return CMD_LIST;
+	}else if(strstr(mensaje,"PING")!=NULL){
+		if(pingFunction(mensaje,caracter,socketId)==ERROR){
+			syslog(LOG_ERR,"ERROR en la funcion nickFunction\n");
+			return ERROR;
+		}
+		//sprintf(caracter[socketId],"%s \r\n",mensaje);
+		return CMD_PING;
 	}
-	return ERROR;
+	return OK;
 	
-}
+}*/
 
 int initServer(char * servidor,int numPort,int longMax){
 
@@ -395,13 +484,12 @@ int main(int argc, char *argv[]){
 
 	numPort = atoi(argv[2]);
 	longMax = atoi(argv[3]);
-
+	strcpy(servidor,argv[1]);
 	if(initServer(argv[1],numPort,longMax)==ERROR){
 		syslog(LOG_ERR,"Error al abrir el servidor\n");		
 		exit(ERROR);
 	}
 
-	//El servidor se pondra a escuchar peticiones
 	i=0;
 	syslog(LOG_INFO,"Esperando conexion\n");
 	socketStC = (socketStruct*) calloc(512,sizeof(socketStruct));
@@ -413,75 +501,12 @@ int main(int argc, char *argv[]){
 		}
 		socketStC[socketIdC].socketId = socketIdC;
 		socketStC[socketIdC].buffer = calloc (50,sizeof(char));
-		syslog(LOG_INFO,"Creando hijo, cliente nº: %d\n",socketIdC);
 
 		if(pthread_create(&thread_id[i],NULL,conexionCliente,(void*) &socketStC[socketIdC]) < 0){
 			printf("No se ha podido crear el hilo.\n");
 			return ERROR;
        		}
 		i++;
-/*
-		mensaje[socketIdC] = (char*) calloc(500,sizeof(char));
-		contestacion[socketIdC] = (char*) calloc(500,sizeof(char));
-
-		if(recibeDatos(socketIdC,(void **) mensaje) < 0){
-			syslog(LOG_ERR,"Error al recibir el mensaje\n");
-			return ERROR;
-		}
-
-		syslog(LOG_INFO,"El mensaje: %s\n",mensaje[socketIdC]);
-
-		ptr = strtok(mensaje[socketIdC], limitador );    // Primera llamada => Primer token
-		syslog(LOG_INFO,"%s\n", ptr );
-		procesarMensaje(mensaje[socketIdC],contestacion,socketIdC);
-		valor = strlen(contestacion[socketIdC]);
-		if(eviarDatos((const void **) contestacion, valor, socketIdC) == ERROR){
-			syslog(LOG_ERR,"Error al enviar mensaje\n");
-			return ERROR;	
-		}
-
-		while( (ptr = strtok(NULL,limitador)) != NULL ) {   // Posteriores llamadas
-			syslog(LOG_INFO,"Seguimos: %s\n",ptr);
-			proc = procesarMensaje(ptr,contestacion,socketIdC);
-			realizaAccion(proc,socketIdC,contestacion[socketIdC]);
-			valor = strlen(contestacion[socketIdC]);
-			if(eviarDatos((const void **) contestacion, valor, socketIdC) == ERROR){
-				syslog(LOG_ERR,"Error al enviar mensaje\n");
-				return ERROR;	
-			}
-		}
-		while( (read_size = recibeDatos(socketIdC,(void **) mensaje)) > 0 ){
-			ptr = strtok(mensaje[socketIdC], limitador );   
-			proc = procesarMensaje(mensaje[socketIdC],contestacion,socketIdC);
-		}
-*/
-		//cerrarSesion(socketIdC);		
-		//return OK;
-		/*
-		strcpy(mensaje, "Estas conectado conmigo");
-		len=strlen(mensaje);
-		syslog(LOG_INFO,"Llego aki: %s, %d\n",mensaje,len);
-		if(eviarDatos((void*) mensaje, len, socketIdC)<0){
-			syslog(LOG_ERR,"Error al comunicarme con el cliente\n");
-			return;
-		}	
-		syslog(LOG_INFO,"mensaje enviado esperando contestacion\n");
-		while( (read_size = recibeDatos(socketIdC, (void *)mensaje)) > 0 )
-		{
-			//end of string marker
-			mensaje[read_size] = '\0';
-			//Send the message back to client
-			syslog(LOG_INFO,"%s\n",mensaje);
-		}*/
-		//socketStC.socketId = socketIdC;
-		//socketStC.buffer = calloc (50,sizeof(char));
-		//creacion de hilos
-		/*syslog(LOG_INFO,"Creando hijo, cliente nº: %d\n",socketIdC);
-		if(pthread_create(&thread_id[i],NULL,conexionCliente,(void*) &socketIdC) < 0){
-			printf("No se ha podido crear el hilo.\n");
-			return ERROR;
-       		}
-		i++;*/
 	}	
 	return OK;
 }

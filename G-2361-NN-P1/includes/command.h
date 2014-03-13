@@ -13,7 +13,8 @@ enum comandos {
 	CMD_INFO,
 	CMD_INVITE,
 	CMD_LIST,
-	CMD_NAMES
+	CMD_NAMES,
+	CMD_PING
 };
 
 #endif

@@ -38,6 +38,7 @@ User* usersHash_put_(User **hash, int socketId, char *nick) {
 		return user;                    
 	}
 	user = malloc(sizeof(User));
+	user->us = malloc(50);
 	user->nick = malloc(strlen(nick) + 1);
 	strcpy(user->nick, nick);
 	user->socketId = socketId;

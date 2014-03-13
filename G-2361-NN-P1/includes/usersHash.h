@@ -7,6 +7,7 @@
 
 typedef struct {
 	int socketId;
+	char *us;
 	char *nick;
 	//id da thread?
     struct UT_hash_handle hh; // handler
