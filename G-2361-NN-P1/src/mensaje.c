@@ -1,5 +1,8 @@
 #include "../includes/mensaje.h"
 
+char crlf[]="\r\n";
+char inicio[]="Server";
+
 int eviarDatos(const void ** msg, int longitud, int socketIdClient){
 	int enviados=0;
 	while (longitud > 0){
@@ -95,11 +98,9 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 	return ERROR;
 }
 
-int nickFunction(char *mensaje,char**caracter, int socketId){
-	
-	char crlf[4]="\r\n";
+int cmd_nick(char *mensaje,char**caracter, int socketId){
 	char* ptr, *mens;
-	char inicio[8]="Server";
+	
 	int retorno=0,contador=0,i=0;	
 	User * usuario;
 	Channel * canal;
@@ -121,11 +122,8 @@ int nickFunction(char *mensaje,char**caracter, int socketId){
 	return OK;
 }
 
-int joinFunction(char *mensaje,char**caracter, int socketId){
-	
-	char crlf[4]="\r\n";
+int cmd_join(char *mensaje,char**caracter, int socketId){
 	char* ptr, **mens;
-	char inicio[8]="Server";
 	int retorno=0,contador=0,i=0;	
 	User * usuario;
 	Channel * canal;
@@ -170,8 +168,7 @@ int joinFunction(char *mensaje,char**caracter, int socketId){
 
 }
 
-int privMsgFunction(char *mensaje,char**caracter, int socketId){
-	char crlf[4]="\r\n";
+int cmd_privmsg(char *mensaje,char**caracter, int socketId){
 	char* ptr,*canal,*mens,**mens1;
 	int retorno=0,contador=0,i=0;	
 	User * usuario;
@@ -216,9 +213,8 @@ int privMsgFunction(char *mensaje,char**caracter, int socketId){
 	return OK;
 }
 
-int pingFunction(char *mensaje,char**caracter, int socketId){
+int cmd_ping(char *mensaje,char**caracter, int socketId){
 	char* ptr;	
-	char inicio[]="Server";
 	ptr = strtok(mensaje," ");
 	ptr = strtok(NULL," \r\n");
 	sprintf(caracter[socketId],":%s PONG %s :%s",inicio, inicio,ptr);
@@ -231,9 +227,7 @@ int pingFunction(char *mensaje,char**caracter, int socketId){
 }
 
 int procesarMensaje (char * mensaje, char**caracter, int socketId){
-	char crlf[4]="\r\n";
 	char* ptr, *mens;
-	char inicio[8]="Server";
 	int retorno=0,contador=0,i=0;	
 	User * usuario;
 	Channel * canal;
@@ -242,7 +236,7 @@ int procesarMensaje (char * mensaje, char**caracter, int socketId){
 		return ERROR;
 	}
 	if(strstr(mensaje,"NICK")!=NULL){
-		if(nickFunction(mensaje,caracter,socketId)==ERROR){
+		if(cmd_nick(mensaje,caracter,socketId)==ERROR){
 			syslog(LOG_ERR,"ERROR en la funcion nickFunction\n");
 			return ERROR;
 		}
@@ -260,30 +254,36 @@ int procesarMensaje (char * mensaje, char**caracter, int socketId){
 		}
 		return CMD_QUIT;
 	}else if(strstr(mensaje,"JOIN")!=NULL){
-		if(joinFunction(mensaje,caracter,socketId)==ERROR){
+		if(cmd_join(mensaje,caracter,socketId)==ERROR){
 			syslog(LOG_ERR,"ERROR en la funcion joinFunction\n");
 			return ERROR;
 		}
 		//sprintf(caracter[socketId],":%s 366 %s %s \r\n",inicio, usuario->nick,canal->name);
 		return CMD_JOIN;
 	}else if(strstr(mensaje,"PRIVMSG")!=NULL){
-		if(privMsgFunction(mensaje,caracter,socketId)==ERROR){
+		if(cmd_privmsg(mensaje,caracter,socketId)==ERROR){
 			syslog(LOG_ERR,"ERROR en la funcion nickFunction\n");
 			return ERROR;
 		}
 		//sprintf(caracter[socketId],"%s \r\n",mensaje);
 		return CMD_PRIVMSG;
-	}else if(strstr(mensaje,"PASS")!=NULL){
+	} else if(strstr(mensaje,"PASS")!=NULL){
 		sprintf(caracter[socketId],"%s \r\n",mensaje);
 		return CMD_PASS;
-	}else if(strstr(mensaje,"LIST")!=NULL){
-		if(realizaAccion(CMD_LIST,socketId,ptr)==ERROR){
+	} else if(strstr(mensaje,"LIST")!=NULL){
+		if(cmd_list(mensaje,caracter,socketId)==ERROR){
 			return ERROR;
 		}
 		sprintf(caracter[socketId],"%s \r\n",mensaje);
 		return CMD_LIST;
-	}else if(strstr(mensaje,"PING")!=NULL){
-		if(pingFunction(mensaje,caracter,socketId)==ERROR){
+	} else if(strstr(mensaje,"NAMES")!=NULL){
+		if(cmd_names(mensaje,caracter,socketId)==ERROR){
+			return ERROR;
+		}
+		sprintf(caracter[socketId],"%s \r\n",mensaje);
+		return CMD_NAMES;
+	} else if(strstr(mensaje,"PING")!=NULL){
+		if(cmd_ping(mensaje,caracter,socketId)==ERROR){
 			syslog(LOG_ERR,"ERROR en la funcion nickFunction\n");
 			return ERROR;
 		}
@@ -292,4 +292,106 @@ int procesarMensaje (char * mensaje, char**caracter, int socketId){
 	}
 	return OK;
 	
+}
+
+int cmd_list(char *msg,char**caracter, int socketId) {
+	char *action,*params,*response;
+	User *currentUser;
+	Channel *channel;
+
+	action = strtok(msg," ");
+	params = strtok(NULL,crlf);
+	syslog(LOG_INFO,"%s %s\n",action,params);
+	currentUser = usersHash_get(socketId);
+	response = (char*) calloc(512,sizeof(char));
+
+	if(params != NULL && strstr(params,"#")!=NULL) {
+		channel = channelsHash_get(params);
+
+		if (channel) {
+			sprintf(response,"%s :%s\r\n",channel->name,channel->topic);
+			syslog(LOG_INFO,"%s\n",response);
+			if(sendData(response, socketId) == ERROR){
+					syslog(LOG_ERR,"Error al enviar mensaje\n");
+					return;
+			}
+		}
+	} else {
+		Channel *tmp;
+		HASH_ITER(hh, channelsHash_getAll(), channel, tmp) {
+			sprintf(response,"%s :%s\r\n",channel->name,channel->topic);
+			syslog(LOG_INFO,"%s\n",response);
+			if(sendData(response, socketId) == ERROR){
+					syslog(LOG_ERR,"Error al enviar mensaje\n");
+					return;
+			}
+		}
+	}
+
+	return OK;
+}
+
+int cmd_names(char *msg, char**caracter, int socketId) {
+	char *action,*params,*response;
+	User *currentUser;
+	Channel *channel;
+
+	action = strtok(msg," ");
+	params = strtok(NULL,crlf);
+	syslog(LOG_INFO,"%s %s\n",action,params);
+	currentUser = usersHash_get(socketId);
+	response = (char*) calloc(512,sizeof(char));
+
+	if(params != NULL && strstr(params,"#")!=NULL) {
+		channel = channelsHash_get(params);
+
+		if (channel) {
+			sprintf(response,"%s :",channel->name);
+
+			User *user, *tmp;
+			HASH_ITER(hh, channel->users, user, tmp) {
+				strcat(response,user->nick);
+    			strcat(response," ");
+    		}
+				
+			syslog(LOG_INFO,"%s\n",response);
+			if(sendData(response, socketId) == ERROR){
+				syslog(LOG_ERR,"Error al enviar mensaje\n");
+				return;
+			}
+		}
+	} else {
+		Channel *tmp;
+		HASH_ITER(hh, channelsHash_getAll(), channel, tmp) {
+			sprintf(response,"%s :",channel->name);
+
+			User *user, *tmp;
+			HASH_ITER(hh, channel->users, user, tmp) {
+				strcat(response,user->nick);
+    			strcat(response," ");
+    		}
+
+			syslog(LOG_INFO,"%s\n",response);
+			if(sendData(response, socketId) == ERROR){
+					syslog(LOG_ERR,"Error al enviar mensaje\n");
+					return;
+			}
+		}
+	}
+
+	return OK;
+}
+
+int sendData(const char *string, int socketIdClient) {
+	int sentData = 0;
+	int stringSize = strlen(string);
+	while (stringSize > 0){
+		sentData = send(socketIdClient, string, stringSize, 0);
+		if (sentData <= 0){
+			syslog(LOG_ERR,"Error al enviar datos\n");
+			return ERROR;
+		}
+		stringSize -= sentData;
+	}
+	return sentData;
 }

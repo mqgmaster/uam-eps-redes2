@@ -22,8 +22,10 @@
 int eviarDatos(const void ** msg, int longitud, int socketIdClient);
 int recibeDatos(int socketId, void ** msg);
 int realizaAccion (int accion, int socketId, char *mensaje);
-int nickFunction(char *mensaje,char**caracter, int socketId);
-int joinFunction(char *mensaje,char**caracter, int socketId);
-int privMsgFunction(char *mensaje,char**caracter, int socketId);
-int pingFunction(char *mensaje,char**caracter, int socketId);
+int cmd_nick(char *mensaje,char**caracter, int socketId);
+int cmd_join(char *mensaje,char**caracter, int socketId);
+int cmd_privmsg(char *mensaje,char**caracter, int socketId);
+int cmd_ping(char *mensaje,char**caracter, int socketId);
+int cmd_list(char *msg,char**caracter, int socketId);
+int cmd_names(char *msg, char**caracter, int socketId);
 int procesarMensaje (char * mensaje, char**caracter, int socketId);

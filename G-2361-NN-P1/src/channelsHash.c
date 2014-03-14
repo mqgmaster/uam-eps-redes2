@@ -16,6 +16,7 @@ Channel* channelsHash_put(char *name, char * topic) {
 	channel->name = malloc(strlen(name) + 1);
 	channel->topic = malloc(strlen(topic) + 1);
 	channel->users = NULL;
+	strcpy(channel->topic, "topic");
 	strcpy(channel->name, name);
 	HASH_ADD_STR(channelsHash, name, channel);
 	return channel;

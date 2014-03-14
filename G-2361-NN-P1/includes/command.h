@@ -1,7 +1,7 @@
 #ifndef COMMAND_H
 #define COMMAND_H
 
-enum comandos {
+enum commands {
 	CMD_NICK,
 	CMD_USER,
 	CMD_QUIT,
@@ -15,6 +15,11 @@ enum comandos {
 	CMD_LIST,
 	CMD_NAMES,
 	CMD_PING
+};
+
+enum response {
+	RPL_LIST = 322,
+	RPL_LISTEND = 323,
 };
 
 #endif
