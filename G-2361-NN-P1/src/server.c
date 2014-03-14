@@ -50,7 +50,7 @@ void * conexionCliente(void *socket_desc){
 	contestacion[sock.socketId] = (char*) calloc(512,sizeof(char));
 
 	usersHash_beginWrite();
-	usersHash_put(sock.socketId, "");
+	usersHash_put(sock.socketId, "temp");
 	usersHash_endWrite();
 
 	sprintf(contestacion[sock.socketId],":%s 020 * :Please wait wile we process your connection to %s\r\n",servidor,servidor);

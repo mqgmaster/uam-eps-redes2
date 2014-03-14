@@ -20,6 +20,8 @@ enum commands {
 enum response {
 	RPL_LIST = 322,
 	RPL_LISTEND = 323,
+	ERR_NONICKNAMEGIVEN = 431,
+	ERR_NICKNAMEINUSE = 433,
 };
 
 #endif

@@ -25,6 +25,7 @@ void channelsHash_deleteUserFromAll(User *user);
 void channelsHash_printLog();
 int channelsHash_size();
 int channelsHash_usersSize(Channel *channel);
+int channelsHash_existsUser(Channel *channel, User *user);
 
 //control de threads
 void channelsHash_beginRead();

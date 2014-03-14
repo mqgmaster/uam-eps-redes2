@@ -65,6 +65,7 @@ User* usersHash_getByNick_(User **hash, char *nick) {
 			return user;
 		}
 	}
+	return NULL;
 }
 
 void usersHash_delete_(User **hash, int socketId) {

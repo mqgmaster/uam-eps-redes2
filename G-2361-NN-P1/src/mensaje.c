@@ -42,15 +42,6 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 	User *usuario;
 	switch(accion){
 		case CMD_NICK:
-			/*usersHash_printLog();*/
-			usersHash_beginWrite();
-			usersHash_put(socketId, mensaje);
-			usersHash_endWrite();
-
-			usersHash_beginRead();
-			usersHash_printLog();
-			usersHash_endRead();
-			return OK;
 		break;
 		case CMD_USER:
 		break;
@@ -107,23 +98,59 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 }
 
 int cmd_nick(char *mensaje,char**caracter, int socketId){
-	char* ptr, *mens;
-	int retorno=0,contador=0,i=0;	
-	
-	ptr = strtok(mensaje," ");
-	ptr = strtok(NULL," \r\n");
-	syslog(LOG_INFO,"%s %s\n",mensaje,ptr);
-	
-	retorno = realizaAccion(CMD_NICK,socketId,ptr); 
-	if(retorno == ERROR){
-		return ERROR;
-	}else{
-		sprintf(caracter[socketId],":%s 001 %s :Welcome to the Internet Relay Network %s \r\n",inicio,ptr,ptr);
-		if(eviarDatos((const void **) caracter, strlen(caracter[socketId]),socketId) == ERROR){
-			syslog(LOG_ERR,"Error al enviar mensaje\n");
-			return ERROR;	
+	char* action, *nick;
+	char *message,*previousNick;
+	message = (char*) calloc(512,sizeof(char));
+	previousNick = (char*) calloc(50,sizeof(char));
+
+	action = strtok(mensaje," ");
+	nick = strtok(NULL," ");
+	syslog(LOG_INFO,"%s %s\n",mensaje,nick);
+	if (nick == NULL) {
+		sprintf(message,":%s %d %s :No nickname given%s",inicio,ERR_NONICKNAMEGIVEN,nick,crlf);
+		sendData(message, socketId);
+		return OK;
+	} 
+
+	usersHash_beginRead();
+	User *user = usersHash_getByNick(nick);
+	if (user) {
+		if (user->socketId != socketId) {
+			sprintf(message,":%s %d %s :Nickname is already in use%s",inicio,ERR_NICKNAMEINUSE,nick,crlf);
+			sendData(message, socketId);
+			usersHash_endRead();
+			return OK;
 		}
 	}
+	usersHash_endRead();
+
+	usersHash_beginWrite();
+	User *currentUser = usersHash_get(socketId);
+	strcpy(previousNick,currentUser->nick);
+	usersHash_put(socketId, nick);
+	usersHash_endWrite();
+
+	usersHash_beginRead();
+	usersHash_printLog();
+
+	if (strcmp(previousNick, "temp") != 0) {
+		sprintf(message,":%s!~%s NICK %s%s",previousNick,previousNick,nick,crlf);
+		syslog(LOG_INFO,"%s\n",message);
+		User *aUser, *tmp;
+		HASH_ITER(hh, usersHash_getAll(), aUser, tmp) {
+			if(sendData(message, aUser->socketId) == ERROR){
+				syslog(LOG_ERR,"Error al enviar mensaje\n");
+				return;	
+			}
+		}
+	}
+	
+	sprintf(caracter[socketId],":%s 001 %s :Welcome to the Internet Relay Network %s \r\n",inicio,nick,nick);
+	if(eviarDatos((const void **) caracter, strlen(caracter[socketId]),socketId) == ERROR){
+		syslog(LOG_ERR,"Error al enviar mensaje\n");
+		return ERROR;	
+	}
+	usersHash_endRead();
 	return OK;
 }
 
@@ -258,36 +285,32 @@ int procesarMensaje (char * mensaje, char**caracter, int socketId){
 			return ERROR;
 		}
 		return CMD_NICK;
-	}else if(strstr(mensaje,"USER")!=NULL){
-		//sprintf(caracter[socketId],"%s %s \r\n",inicio,mensaje);
+	} else if(strstr(mensaje,"USER")!=NULL){
 		return CMD_USER;
-	}else if(strstr(mensaje,"QUIT")!=NULL){
+	} else if(strstr(mensaje,"QUIT")!=NULL){
 		if(cmd_quit(mensaje,caracter,socketId)==ERROR){
-			syslog(LOG_ERR,"ERROR en la funcion joinFunction\n");
+			syslog(LOG_ERR,"ERROR en la funcion cmd_quit\n");
 			return ERROR;
 		}
-		ptr = strtok(mensaje," ");
-		ptr = strtok(mensaje," ");
-		if(ptr==NULL){
-			sprintf(caracter[socketId],":%s QUIT \r\n",inicio);
-		}else{
-			sprintf(caracter[socketId],":%s QUIT :%s \r\n",inicio,ptr);
-		}
 		return CMD_QUIT;
-	}else if(strstr(mensaje,"JOIN")!=NULL){
+	} else if(strstr(mensaje,"JOIN")!=NULL){
 		if(cmd_join(mensaje,caracter,socketId)==ERROR){
 			syslog(LOG_ERR,"ERROR en la funcion joinFunction\n");
 			return ERROR;
 		}
-		//sprintf(caracter[socketId],":%s 366 %s %s \r\n",inicio, usuario->nick,canal->name);
 		return CMD_JOIN;
-	}else if(strstr(mensaje,"PRIVMSG")!=NULL){
+	} else if(strstr(mensaje,"PRIVMSG")!=NULL){
 		if(cmd_privmsg(mensaje,caracter,socketId)==ERROR){
-			syslog(LOG_ERR,"ERROR en la funcion nickFunction\n");
+			syslog(LOG_ERR,"ERROR en la funcion cmd_privmsg\n");
 			return ERROR;
 		}
-		//sprintf(caracter[socketId],"%s \r\n",mensaje);
 		return CMD_PRIVMSG;
+	} else if(strstr(mensaje,"PART")!=NULL){
+		if(cmd_part(mensaje,caracter,socketId)==ERROR){
+			syslog(LOG_ERR,"ERROR en la funcion cmd_part\n");
+			return ERROR;
+		}
+		return CMD_PART;
 	} else if(strstr(mensaje,"PASS")!=NULL){
 		sprintf(caracter[socketId],"%s \r\n",mensaje);
 		return CMD_PASS;
@@ -308,7 +331,6 @@ int procesarMensaje (char * mensaje, char**caracter, int socketId){
 			syslog(LOG_ERR,"ERROR en la funcion nickFunction\n");
 			return ERROR;
 		}
-		//sprintf(caracter[socketId],"%s \r\n",mensaje);
 		return CMD_PING;
 	}
 	return OK;
@@ -331,7 +353,7 @@ int cmd_list(char *msg,char**caracter, int socketId) {
 		channel = channelsHash_get(params);
 
 		if (channel) {
-			sprintf(response,"%s :%s\r\n",channel->name,channel->topic);
+			sprintf(response,"%s :%s%s",channel->name,channel->topic,crlf);
 			syslog(LOG_INFO,"%s\n",response);
 			if(sendData(response, socketId) == ERROR){
 					syslog(LOG_ERR,"Error al enviar mensaje\n");
@@ -341,7 +363,7 @@ int cmd_list(char *msg,char**caracter, int socketId) {
 	} else {
 		Channel *tmp;
 		HASH_ITER(hh, channelsHash_getAll(), channel, tmp) {
-			sprintf(response,"%s :%s\r\n",channel->name,channel->topic);
+			sprintf(response,"%s :%s%s",channel->name,channel->topic,crlf);
 			syslog(LOG_INFO,"%s\n",response);
 			if(sendData(response, socketId) == ERROR){
 					syslog(LOG_ERR,"Error al enviar mensaje\n");
@@ -378,6 +400,8 @@ int cmd_names(char *msg, char**caracter, int socketId) {
     			strcat(response," ");
     		}
 				
+    		strcat(response,crlf);
+				
 			syslog(LOG_INFO,"%s\n",response);
 			if(sendData(response, socketId) == ERROR){
 				syslog(LOG_ERR,"Error al enviar mensaje\n");
@@ -394,6 +418,7 @@ int cmd_names(char *msg, char**caracter, int socketId) {
 				strcat(response,user->nick);
     			strcat(response," ");
     		}
+    		strcat(response,crlf);
 
 			syslog(LOG_INFO,"%s\n",response);
 			if(sendData(response, socketId) == ERROR){
@@ -409,56 +434,23 @@ int cmd_names(char *msg, char**caracter, int socketId) {
 }
 
 int cmd_quit(char *msg, char**caracter, int socketId) {
+	char *message;
+	message = (char*) calloc(512,sizeof(char));
 	
-	char **mens,mensaje[50]="";
-	mens = (char**) calloc(512,sizeof(char*));
-	Channel *channel, *channelTmp;
-	
-	int flag =0,i=0;
-
-	syslog(LOG_INFO,"cerrando sesion.....\n");
-
-	if(cerrarSesion(socketId)==ERROR){
-		syslog(LOG_ERR,"Error al cerrar sesion\n");
-		return ERROR;
-	}
-
 	channelsHash_beginRead();
 	usersHash_beginRead();
 
-	User *usuario = usersHash_get(socketId);
+	User *userExiting = usersHash_get(socketId);
+	sprintf(message,":%s!~%s QUIT :Adios%s",userExiting->nick,userExiting->nick,crlf);
+	syslog(LOG_INFO,"%s\n",message);
 
-	HASH_ITER(hh, channelsHash_getAll(), channel, channelTmp) {
-		flag = 0;		
-		User *user, *tmp;
-		HASH_ITER(hh, channel->users, user, tmp) {
-			if(user->socketId == usuario->socketId){
-				flag = 1;			
-			}
-    		}
-		if(flag == 1) {
-			sprintf(caracter[socketId],":%s 353 ",inicio);
-			HASH_ITER(hh, channel->users, user, tmp) {
-				if(i==0){
-					sprintf(mensaje,"%s = %s :",usuario->nick,channel->name);
-					strcat(caracter[socketId],mensaje);
-					i=1;
-				}
-				if(user->socketId != usuario->socketId) {			
-		    			strcat(caracter[socketId],user->nick);
-		    			strcat(caracter[socketId]," ");
-				}					
-				
-	    		}
-			strcat(caracter[socketId],crlf);
-			syslog(LOG_INFO,"AKIII : %s\n",caracter[socketId]);
-
-			HASH_ITER(hh, channel->users, user, tmp) {
-				if(user->socketId != usuario->socketId){	
-					mens[user->socketId] = (char*) calloc(512,sizeof(char));
-					strcpy(mens[user->socketId],caracter[socketId]);
-					syslog(LOG_INFO,"%s\n",mens[user->socketId]);
-					if(eviarDatos((const void **) mens, strlen(caracter[socketId]),user->socketId) == ERROR){
+	Channel *channel;
+	User *user;
+	for (channel = channelsHash_getAll(); channel != NULL; channel = channel->hh.next) {
+		if (channelsHash_existsUser(channel, userExiting) == TRUE) {
+			for (user = channel->users; user != NULL; user = user->hh.next) {
+				if(user->socketId != userExiting->socketId) {
+					if(sendData(message, user->socketId) == ERROR){
 						syslog(LOG_ERR,"Error al enviar mensaje\n");
 						return;	
 					}
@@ -473,15 +465,65 @@ int cmd_quit(char *msg, char**caracter, int socketId) {
 	channelsHash_beginWrite();
 	usersHash_beginWrite();
 
-	usersHash_delete(usuario->socketId);
-	channelsHash_deleteUserFromAll(usuario);
+	usersHash_delete(userExiting->socketId);
+	channelsHash_deleteUserFromAll(userExiting);
 
 	usersHash_printLog();
 
 	channelsHash_endWrite();
 	usersHash_endWrite();
 
+	syslog(LOG_INFO,"cerrando sesion.....\n");
+	if(cerrarSesion(socketId)==ERROR){
+		syslog(LOG_ERR,"Error al cerrar sesion\n");
+		return ERROR;
+	}
+
 	pthread_exit(OK);
+}
+
+int cmd_part(char *msg, char**caracter, int socketId) {
+	char *action,*params,*response;
+	Channel *channel;
+	User *userExiting;
+	action = strtok(msg," ");
+	params = strtok(NULL," ");
+	syslog(LOG_INFO,"%s %s\n",action,params);
+	response = (char*) calloc(512,sizeof(char));
+
+	channelsHash_beginRead();
+
+	if(params != NULL && strstr(params,"#")!=NULL) {
+		channel = channelsHash_get(params);
+
+		userExiting = usersHash_get(socketId);
+		if (channelsHash_existsUser(channel, userExiting) == TRUE) {
+			sprintf(response,":%s!~%s PART %s%s",userExiting->nick,userExiting->nick,channel->name,crlf);
+			syslog(LOG_INFO,"%s\n",response);
+
+			User *user,*tmp;
+			HASH_ITER(hh, channel->users, user, tmp) {
+				if(sendData(response, user->socketId) == ERROR){
+					syslog(LOG_ERR,"Error al enviar mensaje\n");
+					return;	
+				}
+    		}
+		}
+	}
+
+	channelsHash_endRead();
+
+	channelsHash_beginWrite();
+	usersHash_beginWrite();
+
+	channelsHash_deleteUser(channel, userExiting);
+
+	channelsHash_printLog();
+
+	channelsHash_endWrite();
+	usersHash_endWrite();
+
+	return OK;
 }
 
 int sendData(const char *string, int socketId) {

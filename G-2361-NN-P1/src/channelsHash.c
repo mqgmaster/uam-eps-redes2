@@ -32,6 +32,18 @@ void channelsHash_addUser(Channel *channel, User *user) {
 	}
 }
 
+int channelsHash_existsUser(Channel *channel, User *user) {
+	User *userTemp;
+	if (channel != NULL && user != NULL) {
+		for (userTemp = channel->users; userTemp != NULL; userTemp = userTemp->hh.next) {
+			if(user->socketId == userTemp->socketId) {
+				return TRUE;
+			}
+		}
+	}
+	return FALSE;
+}
+
 Channel* channelsHash_get(char *name) {
 	Channel *channel;
 	HASH_FIND_STR(channelsHash, name, channel);

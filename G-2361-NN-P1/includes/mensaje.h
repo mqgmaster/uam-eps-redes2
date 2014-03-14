@@ -29,5 +29,6 @@ int cmd_ping(char *mensaje,char**caracter, int socketId);
 int cmd_list(char *msg,char**caracter, int socketId);
 int cmd_names(char *msg, char**caracter, int socketId);
 int cmd_quit(char *msg, char**caracter, int socketId);
+int cmd_part(char *msg, char**caracter, int socketId);
 int procesarMensaje (char * mensaje, char**caracter, int socketId);
 int sendData(const char *string, int socketId);
