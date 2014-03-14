@@ -409,6 +409,13 @@ int cmd_names(char *msg, char**caracter, int socketId) {
 }
 
 int cmd_quit(char *msg, char**caracter, int socketId) {
+	
+	char **mens,mensaje[50]="";
+	mens = (char**) calloc(512,sizeof(char*));
+	Channel *channel, *channelTmp;
+	
+	int flag =0,i=0;
+
 	syslog(LOG_INFO,"cerrando sesion.....\n");
 
 	if(cerrarSesion(socketId)==ERROR){
@@ -416,12 +423,58 @@ int cmd_quit(char *msg, char**caracter, int socketId) {
 		return ERROR;
 	}
 
+	channelsHash_beginRead();
+	usersHash_beginRead();
+
+	User *usuario = usersHash_get(socketId);
+
+	HASH_ITER(hh, channelsHash_getAll(), channel, channelTmp) {
+		flag = 0;		
+		User *user, *tmp;
+		HASH_ITER(hh, channel->users, user, tmp) {
+			if(user->socketId == usuario->socketId){
+				flag = 1;			
+			}
+    		}
+		if(flag == 1) {
+			sprintf(caracter[socketId],":%s 353 ",inicio);
+			HASH_ITER(hh, channel->users, user, tmp) {
+				if(i==0){
+					sprintf(mensaje,"%s = %s :",usuario->nick,channel->name);
+					strcat(caracter[socketId],mensaje);
+					i=1;
+				}
+				if(user->socketId != usuario->socketId) {			
+		    			strcat(caracter[socketId],user->nick);
+		    			strcat(caracter[socketId]," ");
+				}					
+				
+	    		}
+			strcat(caracter[socketId],crlf);
+			syslog(LOG_INFO,"AKIII : %s\n",caracter[socketId]);
+
+			HASH_ITER(hh, channel->users, user, tmp) {
+				if(user->socketId != usuario->socketId){	
+					mens[user->socketId] = (char*) calloc(512,sizeof(char));
+					strcpy(mens[user->socketId],caracter[socketId]);
+					syslog(LOG_INFO,"%s\n",mens[user->socketId]);
+					if(eviarDatos((const void **) mens, strlen(caracter[socketId]),user->socketId) == ERROR){
+						syslog(LOG_ERR,"Error al enviar mensaje\n");
+						return;	
+					}
+				}
+			}
+		}
+	}
+
+	channelsHash_endRead();
+	usersHash_endRead();
+
 	channelsHash_beginWrite();
 	usersHash_beginWrite();
 
-	User *user = usersHash_get(socketId);
-	usersHash_delete(user->socketId);
-	channelsHash_deleteUserFromAll(user);
+	usersHash_delete(usuario->socketId);
+	channelsHash_deleteUserFromAll(usuario);
 
 	usersHash_printLog();
 
