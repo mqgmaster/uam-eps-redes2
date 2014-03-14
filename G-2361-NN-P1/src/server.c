@@ -49,6 +49,10 @@ void * conexionCliente(void *socket_desc){
 	mensaje[sock.socketId] = (char*) calloc(512,sizeof(char));
 	contestacion[sock.socketId] = (char*) calloc(512,sizeof(char));
 
+	usersHash_beginWrite();
+	usersHash_put(sock.socketId, "");
+	usersHash_endWrite();
+
 	sprintf(contestacion[sock.socketId],":%s 020 * :Please wait wile we process your connection to %s\r\n",servidor,servidor);
 	if(eviarDatos((const void **) contestacion, strlen(contestacion[sock.socketId]), sock.socketId) == ERROR){
 		syslog(LOG_ERR,"Error al enviar mensaje\n");
@@ -125,7 +129,8 @@ int main(int argc, char *argv[]){
 		return ERROR;
 	}
 
-	//iniciarStructuras(canales);
+	usersHash_init();
+	channelsHash_init();
 
 	numPort = atoi(argv[2]);
 	longMax = atoi(argv[3]);

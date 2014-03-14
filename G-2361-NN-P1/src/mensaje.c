@@ -5,15 +5,20 @@ char inicio[]="Server";
 
 int eviarDatos(const void ** msg, int longitud, int socketIdClient){
 	int enviados=0;
+	usersHash_beginRead();
+	User *user = usersHash_get(socketIdClient);
+	userSocket_beginWrite(user); 
 	while (longitud > 0){
-		enviados = send(socketIdClient, msg[socketIdClient], longitud, 0);
+		enviados = send(user->socketId, msg[user->socketId], longitud, 0);
 		if (enviados <= 0){
 			syslog(LOG_ERR,"Error al enviar datos\n");
 			return ERROR;
 		}
-		msg[socketIdClient] += enviados;
+		msg[user->socketId] += enviados;
 		longitud -= enviados;
 	}
+	userSocket_endWrite(user); 
+	usersHash_endRead();
 	return enviados;
 }
 
@@ -38,29 +43,36 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 	switch(accion){
 		case CMD_NICK:
 			/*usersHash_printLog();*/
+			usersHash_beginWrite();
 			usersHash_put(socketId, mensaje);
+			usersHash_endWrite();
+
+			usersHash_beginRead();
 			usersHash_printLog();
+			usersHash_endRead();
 			return OK;
 		break;
 		case CMD_USER:
 		break;
 		case CMD_QUIT:
-			syslog(LOG_INFO,"cerrando sesion.....\n");
-			if(cerrarSesion(socketId)==ERROR){
-				syslog(LOG_ERR,"Error al cerrar sesion\n");
-				return ERROR;
-			}
-			exit(OK);
-			break;
+		break;
 		case CMD_PART:
 		break;	
 		case CMD_JOIN:
 			syslog(LOG_INFO,"recibido mensaje: %s\n", mensaje);
 			if(strstr(mensaje, "#")){
-				channel = channelsHash_put(mensaje, "topic");
+				usersHash_beginRead();
+				channelsHash_beginWrite();
+
+				channelsHash_put(mensaje, "topic");
+
+				channel = channelsHash_get(mensaje);
 				usuario = usersHash_get(socketId);
 				syslog(LOG_INFO,"canal creado %s %d %s\n", channel->name, socketId, usuario->nick);
 				channelsHash_addUser(channel, usuario);
+
+				channelsHash_endWrite();
+				usersHash_endRead();
 				return OK;
 			}else{
 				syslog(LOG_ERR,"Error en el formato del canal #<canal>%s\n", mensaje);
@@ -70,24 +82,20 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 		case CMD_PRIVMSG:
 			/*lista el contenido del hash.*/
 			syslog(LOG_INFO,"list recibido mensaje: %s\n", mensaje);
-			channelsHash_deleteUser(channelsHash_get("canal"), usersHash_get(1));
 		break;
 		case CMD_LIST:
 			/*lista el contenido del hash.*/
 			syslog(LOG_INFO,"list recibido mensaje: %s\n", mensaje);
+			usersHash_beginRead();
+			channelsHash_beginRead();
+
 			usersHash_printLog();
 			usersHash_size();
 			channelsHash_size();
-			channelsHash_usersSize(channelsHash_get("#canal"));
 			channelsHash_printLog();
-			/* iteraciones en la hash: 
-			* hh -> handler de las hash
-			*/
-			syslog(LOG_INFO,"test con iteraciones\n");
-		 	User *testUser, *tmp;
-			HASH_ITER(hh, usersHash_getAll(), testUser, tmp) {
-		    	syslog(LOG_INFO,"usuario (%s)\n", testUser->nick);
-			}			
+
+			usersHash_endRead();
+			channelsHash_endRead();
 		break;
 		case CMD_PING:
 		break;
@@ -100,10 +108,7 @@ int realizaAccion (int accion, int socketId, char *mensaje){
 
 int cmd_nick(char *mensaje,char**caracter, int socketId){
 	char* ptr, *mens;
-	
 	int retorno=0,contador=0,i=0;	
-	User * usuario;
-	Channel * canal;
 	
 	ptr = strtok(mensaje," ");
 	ptr = strtok(NULL," \r\n");
@@ -135,6 +140,9 @@ int cmd_join(char *mensaje,char**caracter, int socketId){
 		sprintf(caracter[socketId],":%s Error en el formato del canal #<canal> %s\r\n",inicio,ptr);
 		return ERROR;
 	}
+	usersHash_beginRead();
+	channelsHash_beginRead();
+
 	usuario = usersHash_get(socketId);
 	canal = channelsHash_get(ptr);
 	sprintf(caracter[socketId],":%s!%s JOIN :%s\r\n",usuario->nick,inicio,canal->name);
@@ -143,7 +151,6 @@ int cmd_join(char *mensaje,char**caracter, int socketId){
 		return;	
 	}
 	sprintf(caracter[socketId],":%s 353 %s = %s :",inicio, usuario->nick,canal->name);		
-	contador = channelsHash_usersSize(canal);
 	
 	User *user, *tmp;
 	HASH_ITER(hh, canal->users, user, tmp) {
@@ -165,7 +172,8 @@ int cmd_join(char *mensaje,char**caracter, int socketId){
 		}
 	}
 	
-
+	usersHash_endRead();
+	channelsHash_endRead();
 }
 
 int cmd_privmsg(char *mensaje,char**caracter, int socketId){
@@ -180,10 +188,16 @@ int cmd_privmsg(char *mensaje,char**caracter, int socketId){
 	canal = strtok(NULL," :");
 	mens = strtok(NULL,"\r\n");
 	syslog(LOG_INFO,"%s %s %s\n",ptr,canal,mens);
+
+	usersHash_beginRead();
+
 	usuario = usersHash_get(socketId);
+
 	mens1 = (char**) calloc(512,sizeof(char*));
 	if(strstr(canal,"#")!=NULL){
 		//es un canal
+		channelsHash_beginRead();
+
 		chan = channelsHash_get(canal);
 		chanSize = channelsHash_usersSize(chan);
 
@@ -198,18 +212,23 @@ int cmd_privmsg(char *mensaje,char**caracter, int socketId){
 				}
 			}
 		}
+		channelsHash_endRead();
+
 	}else{
 		//es un usuario
 		user = usersHash_getByNick(canal);
-		mens1[user->socketId] = (char*) calloc(512,sizeof(char));
-		sprintf(mens1[user->socketId],":%s PRIVMSG %s %s\r\n",usuario->nick,user->nick,mens);
-		syslog(LOG_INFO,"%s\n",mens1[user->socketId]);
-		if(eviarDatos((const void **) mens1, strlen(mens1[user->socketId]),user->socketId) == ERROR){
-				syslog(LOG_ERR,"Error al enviar mensaje\n");
-				return;
-		}		
+		if (user) {
+			mens1[user->socketId] = (char*) calloc(512,sizeof(char));
+			sprintf(mens1[user->socketId],":%s PRIVMSG %s %s\r\n",usuario->nick,user->nick,mens);
+			syslog(LOG_INFO,"%s\n",mens1[user->socketId]);
+			if(eviarDatos((const void **) mens1, strlen(mens1[user->socketId]),user->socketId) == ERROR){
+					syslog(LOG_ERR,"Error al enviar mensaje\n");
+					return;
+			}
+		}
 	}
 
+	usersHash_endRead();
 	return OK;
 }
 
@@ -227,10 +246,8 @@ int cmd_ping(char *mensaje,char**caracter, int socketId){
 }
 
 int procesarMensaje (char * mensaje, char**caracter, int socketId){
-	char* ptr, *mens;
-	int retorno=0,contador=0,i=0;	
-	User * usuario;
-	Channel * canal;
+	char* ptr;
+
 	if(mensaje == NULL){
 		syslog(LOG_ERR,"Error mensaje null\n");
 		return ERROR;
@@ -245,6 +262,10 @@ int procesarMensaje (char * mensaje, char**caracter, int socketId){
 		//sprintf(caracter[socketId],"%s %s \r\n",inicio,mensaje);
 		return CMD_USER;
 	}else if(strstr(mensaje,"QUIT")!=NULL){
+		if(cmd_quit(mensaje,caracter,socketId)==ERROR){
+			syslog(LOG_ERR,"ERROR en la funcion joinFunction\n");
+			return ERROR;
+		}
 		ptr = strtok(mensaje," ");
 		ptr = strtok(mensaje," ");
 		if(ptr==NULL){
@@ -296,14 +317,15 @@ int procesarMensaje (char * mensaje, char**caracter, int socketId){
 
 int cmd_list(char *msg,char**caracter, int socketId) {
 	char *action,*params,*response;
-	User *currentUser;
+
 	Channel *channel;
 
 	action = strtok(msg," ");
 	params = strtok(NULL,crlf);
 	syslog(LOG_INFO,"%s %s\n",action,params);
-	currentUser = usersHash_get(socketId);
 	response = (char*) calloc(512,sizeof(char));
+
+	channelsHash_beginRead();
 
 	if(params != NULL && strstr(params,"#")!=NULL) {
 		channel = channelsHash_get(params);
@@ -328,19 +350,21 @@ int cmd_list(char *msg,char**caracter, int socketId) {
 		}
 	}
 
+	channelsHash_endRead();
+
 	return OK;
 }
 
 int cmd_names(char *msg, char**caracter, int socketId) {
 	char *action,*params,*response;
-	User *currentUser;
 	Channel *channel;
 
 	action = strtok(msg," ");
 	params = strtok(NULL,crlf);
 	syslog(LOG_INFO,"%s %s\n",action,params);
-	currentUser = usersHash_get(socketId);
 	response = (char*) calloc(512,sizeof(char));
+
+	channelsHash_beginRead();
 
 	if(params != NULL && strstr(params,"#")!=NULL) {
 		channel = channelsHash_get(params);
@@ -379,19 +403,52 @@ int cmd_names(char *msg, char**caracter, int socketId) {
 		}
 	}
 
+	channelsHash_endRead();
+
 	return OK;
 }
 
-int sendData(const char *string, int socketIdClient) {
+int cmd_quit(char *msg, char**caracter, int socketId) {
+	syslog(LOG_INFO,"cerrando sesion.....\n");
+
+	if(cerrarSesion(socketId)==ERROR){
+		syslog(LOG_ERR,"Error al cerrar sesion\n");
+		return ERROR;
+	}
+
+	channelsHash_beginWrite();
+	usersHash_beginWrite();
+
+	User *user = usersHash_get(socketId);
+	usersHash_delete(user->socketId);
+	channelsHash_deleteUserFromAll(user);
+
+	usersHash_printLog();
+
+	channelsHash_endWrite();
+	usersHash_endWrite();
+
+	pthread_exit(OK);
+}
+
+int sendData(const char *string, int socketId) {
 	int sentData = 0;
 	int stringSize = strlen(string);
+
+	usersHash_beginRead();
+	User *user = usersHash_get(socketId);
+	userSocket_beginWrite(user); 
+
 	while (stringSize > 0){
-		sentData = send(socketIdClient, string, stringSize, 0);
+		sentData = send(user->socketId, string, stringSize, 0);
 		if (sentData <= 0){
 			syslog(LOG_ERR,"Error al enviar datos\n");
 			return ERROR;
 		}
 		stringSize -= sentData;
 	}
+
+	userSocket_endWrite(user); 
+	usersHash_endRead();
 	return sentData;
 }
