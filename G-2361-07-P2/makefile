@@ -15,13 +15,13 @@ chat_funcs.o: $(SOURCES)chat_funcs.c
 
 chat: chat.o chat_funcs.o
 	@echo "\033[32;01mEnlazando\033[00m"
-	@gcc -o $(OUTPUT) $(OBJECTS)chat.o $(OBJECTS)chat_funcs.o `pkg-config --libs gtk+-2.0`
+	@gcc -o $(OUTPUT_CHAT) $(OBJECTS)chat.o $(OBJECTS)chat_funcs.o `pkg-config --libs gtk+-2.0`
 
 sound.o: $(SOURCES)sound.c
 	@echo "\033[32;01mCompilando sound.c\033[00m"
-	@gcc -Wall $(SOURCES)sound.c -c
+	@gcc -Wall $(SOURCES)sound.c -c -o $(OBJECTS)sound.o
 
-prsound: prsound.c sound.o
+prsound: $(SOURCES)prsound.c sound.o
 	@echo "\033[32;01mEnlazando\033[00m"
 	@gcc -o prsound $(SOURCES)prsound.c $(OBJECTS)sound.o `pkg-config --libs libpulse-simple`
 

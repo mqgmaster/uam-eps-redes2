@@ -3,7 +3,7 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
-#include "sound.h"
+#include "../includes/sound.h"
 
 main()
 {

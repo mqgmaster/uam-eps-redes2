@@ -42,10 +42,16 @@ void setTopicProtect(gboolean state);
 void setExternMsg(gboolean state);
 void setSecret(gboolean state);
 void setGuests(gboolean state);
-void setPrivated(gboolean state);
+void setPrivate(gboolean state);
 void setModerated(gboolean state);
 
 /* Función llamada cuando se introduce una entrada */
 void newText (const char *msg);
+
+char * getApodo();
+char * getNombre();
+char * getNombreReal();
+char * getServidor();
+int    getPuerto();
 
 #endif
