@@ -6,6 +6,10 @@
 *                                                                                                  *
 ***************************************************************************************************/
 
+#include <gtk/gtk.h>
+#include <glib.h>
+#include <stdlib.h>
+
 #ifndef _CHAT
 #define _CHAT
 
